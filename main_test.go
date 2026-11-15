@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -47,5 +49,64 @@ func TestProviderFallback(t *testing.T) {
 		if !strings.HasPrefix(c.Official, "https://") {
 			t.Fatalf("no official URL for %s", c.Name)
 		}
+	}
+}
+
+func TestArtworkTitleCleanup(t *testing.T) {
+	tests := map[string]string{
+		"NCIS S5 Ep. 11":         "NCIS",
+		"Bluey S1 E03":           "Bluey",
+		"The Chase Australia":    "The Chase Australia",
+		"The Good Place (2016)":  "The Good Place",
+		"7 News":                 "",
+		"ABC Weather":            "",
+		"":                       "",
+		"NCIS: Hawai'i S3 Ep. 6": "NCIS: Hawai'i",
+	}
+	for in, want := range tests {
+		if got := artworkTitle(in); got != want {
+			t.Errorf("artworkTitle(%q) = %q; want %q", in, got, want)
+		}
+	}
+}
+func TestTrustedTVmazeArtwork(t *testing.T) {
+	for _, raw := range []string{
+		"http://static.tvmaze.com/img/poster.jpg", "https://example.com/poster.png",
+		"https://static.tvmaze.com.evil.example/p.png", "file:///etc/passwd",
+	} {
+		if trustedPosterURL(raw) {
+			t.Errorf("accepted unsafe poster URL %s", raw)
+		}
+	}
+	if !trustedPosterURL("https://static.tvmaze.com/uploads/images/medium_portrait/123/abc.jpg") {
+		t.Fatal("rejected official TVmaze image CDN")
+	}
+	if canonicalTitle("NCIS: Hawai'i") != canonicalTitle("NCIS Hawai i") {
+		t.Fatal("title comparison should ignore punctuation")
+	}
+}
+
+type artworkTransport func(*http.Request) (*http.Response, error)
+
+func (f artworkTransport) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+func TestArtworkExactMatching(t *testing.T) {
+	old := artworkClient
+	defer func() { artworkClient = old }()
+	artworkClient = &http.Client{Transport: artworkTransport(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host != "api.tvmaze.com" || req.URL.Query().Get("q") != "Bluey" {
+			t.Errorf("unexpected lookup: %s", req.URL)
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"name":"Bluey","url":"https://www.tvmaze.com/shows/42692/bluey","image":{"medium":"https://static.tvmaze.com/uploads/images/medium_portrait/1/bluey.jpg"}}`)), Header: make(http.Header), Request: req}, nil
+	})}
+	result := lookupArtwork("Bluey")
+	if result.Poster == "" || result.Credit != "TVmaze" || result.Page == "" {
+		t.Fatalf("expected attributed image; got %+v", result)
+	}
+	artworkClient = &http.Client{Transport: artworkTransport(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"name":"Bluey: Extra Adventures","image":{"medium":"https://static.tvmaze.com/uploads/images/medium_portrait/1/bluey.jpg"}}`)), Header: make(http.Header), Request: req}, nil
+	})}
+	result = lookupArtwork("Bluey")
+	if result.Poster != "" {
+		t.Fatalf("accepted the wrong programme: %+v", result)
 	}
 }

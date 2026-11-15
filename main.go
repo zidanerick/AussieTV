@@ -28,6 +28,7 @@ import (
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
+const version = "1.2"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -96,6 +97,116 @@ var lastPing atomic.Int64
 var hadPing atomic.Bool
 var server *http.Server
 var uriRegexp = regexp.MustCompile(`URI="([^"]+)"`)
+
+// The guide feed contains channel logos, but not programme images. For clearly
+// identified TV series, look up the poster at TVmaze and show its attribution.
+// An approximate/ambiguous result is intentionally treated as no artwork.
+type Artwork struct {
+	Poster string `json:"poster,omitempty"`
+	Credit string `json:"credit,omitempty"`
+	Page   string `json:"page,omitempty"`
+}
+type artworkCacheEntry struct {
+	Art Artwork
+	At  time.Time
+}
+
+var artMu sync.Mutex
+var artCache = make(map[string]artworkCacheEntry)
+var seasonSuffix = regexp.MustCompile(`(?i)\s+(?:s\d{1,3}\s*(?:ep\.?|e)\s*\d+.*|season\s+\d+.*|series\s+\d+.*)$`)
+var titlePunctuation = regexp.MustCompile(`[^\pL\pN]+`)
+var titleYear = regexp.MustCompile(`\s+\(\d{4}\)$`)
+var artworkClient = &http.Client{Timeout: 9 * time.Second}
+
+func artworkTitle(raw string) string {
+	title := strings.TrimSpace(raw)
+	title = seasonSuffix.ReplaceAllString(title, "")
+	title = titleYear.ReplaceAllString(title, "")
+	title = strings.TrimSpace(title)
+	// Live bulletin names frequently collide with scripted series names.
+	low := strings.ToLower(title)
+	if len([]rune(title)) < 4 || len([]rune(title)) > 95 ||
+		strings.Contains(low, "news") || strings.Contains(low, "weather") ||
+		strings.Contains(low, "live stream") || strings.Contains(low, "bulletin") ||
+		strings.Contains(low, "sport update") || strings.HasPrefix(low, "national lottery") {
+		return ""
+	}
+	return title
+}
+func canonicalTitle(s string) string {
+	return strings.TrimSpace(titlePunctuation.ReplaceAllString(strings.ToLower(s), " "))
+}
+func trustedPosterURL(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && u.Scheme == "https" && u.Hostname() == "static.tvmaze.com" && u.User == nil
+}
+func trustedTVmazeURL(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && u.Scheme == "https" && u.Hostname() == "www.tvmaze.com" && u.User == nil
+}
+func lookupArtwork(title string) Artwork {
+	var empty Artwork
+	req, err := http.NewRequest("GET", "https://api.tvmaze.com/singlesearch/shows?q="+url.QueryEscape(title), nil)
+	if err != nil {
+		return empty
+	}
+	req.Header.Set("User-Agent", "AussieTV/1.2 personal TV guide (TVmaze artwork attribution)")
+	response, err := artworkClient.Do(req)
+	if err != nil {
+		log.Printf("programme art lookup: %v", err)
+		return empty
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return empty
+	}
+	var show struct {
+		Name  string `json:"name"`
+		URL   string `json:"url"`
+		Image struct {
+			Medium   string `json:"medium"`
+			Original string `json:"original"`
+		} `json:"image"`
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, 512<<10)).Decode(&show); err != nil {
+		return empty
+	}
+	if canonicalTitle(show.Name) != canonicalTitle(title) {
+		return empty
+	}
+	poster := show.Image.Medium
+	if !trustedPosterURL(poster) && trustedPosterURL(show.Image.Original) {
+		poster = show.Image.Original
+	}
+	if !trustedPosterURL(poster) {
+		return empty
+	}
+	art := Artwork{Poster: poster, Credit: "TVmaze"}
+	if trustedTVmazeURL(show.URL) {
+		art.Page = show.URL
+	}
+	return art
+}
+func artworkHandler(w http.ResponseWriter, r *http.Request) {
+	title := artworkTitle(r.URL.Query().Get("title"))
+	if title == "" {
+		jsonResponse(w, Artwork{})
+		return
+	}
+	key := canonicalTitle(title)
+	artMu.Lock()
+	cached, exists := artCache[key]
+	artMu.Unlock()
+	if exists && time.Since(cached.At) < 12*time.Hour {
+		jsonResponse(w, cached.Art)
+		return
+	}
+	result := lookupArtwork(title)
+	artMu.Lock()
+	artCache[key] = artworkCacheEntry{Art: result, At: time.Now()}
+	artMu.Unlock()
+	jsonResponse(w, result)
+}
 
 func safeRegion(v string) string {
 	if regionAllowed[v] {
@@ -454,7 +565,7 @@ func startupFailure(err error) {
 }
 func main() {
 	prepareLogging()
-	log.Printf("AussieTV v1.1 starting on %s/%s", runtime.GOOS, runtime.GOARCH)
+	log.Printf("AussieTV v%s starting on %s/%s", version, runtime.GOOS, runtime.GOARCH)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -470,6 +581,7 @@ func main() {
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(b)
 	})
+	mux.HandleFunc("GET /api/artwork", artworkHandler)
 	mux.HandleFunc("GET /api/channels", func(w http.ResponseWriter, r *http.Request) {
 		markPing()
 		jsonResponse(w, loadChannels(r.URL.Query().Get("region")))
