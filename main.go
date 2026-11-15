@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"embed"
 	"encoding/json"
@@ -367,34 +368,93 @@ func heartbeatWatch() {
 		}
 	}
 }
-func openBrowser(addr string) {
+func openBrowser(addr string) error {
 	if os.Getenv("AUSSIE_TV_NO_BROWSER") == "1" {
-		return
+		log.Print("Automatic browser launch disabled for testing")
+		return nil
 	}
 	if runtime.GOOS == "windows" {
-		pf := os.Getenv("ProgramFiles")
-		pfx := os.Getenv("ProgramFiles(x86)")
-		local := os.Getenv("LOCALAPPDATA")
-		paths := []string{filepath.Join(pfx, "Microsoft", "Edge", "Application", "msedge.exe"), filepath.Join(pf, "Microsoft", "Edge", "Application", "msedge.exe"), filepath.Join(pf, "Google", "Chrome", "Application", "chrome.exe"), filepath.Join(pfx, "Google", "Chrome", "Application", "chrome.exe"), filepath.Join(local, "Google", "Chrome", "Application", "chrome.exe")}
-		for _, path := range paths {
-			if _, err := os.Stat(path); err == nil {
-				_ = exec.Command(path, "--app="+addr, "--window-size=1360,900").Start()
-				return
+		// Prefer the Windows URL association. Unlike hard-coded browser paths this
+		// supports custom browser installs and Microsoft Store browser packages.
+		var failures []string
+		for _, args := range [][]string{
+			{"/c", "start", "", addr},
+		} {
+			if err := exec.Command("cmd.exe", args...).Start(); err == nil {
+				log.Printf("Requested Windows default browser: %s", addr)
+				return nil
+			} else {
+				failures = append(failures, "cmd/start: "+err.Error())
 			}
 		}
-		_ = exec.Command("rundll32", "url.dll,FileProtocolHandler", addr).Start()
-		return
+		// Edge and Chrome app mode are fallbacks, not prerequisites.
+		paths := []string{}
+		for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"} {
+			if base := os.Getenv(env); base != "" {
+				paths = append(paths,
+					filepath.Join(base, "Microsoft", "Edge", "Application", "msedge.exe"),
+					filepath.Join(base, "Google", "Chrome", "Application", "chrome.exe"))
+			}
+		}
+		for _, path := range paths {
+			if _, err := os.Stat(path); err != nil {
+				continue
+			}
+			if err := exec.Command(path, "--app="+addr, "--window-size=1360,900").Start(); err == nil {
+				log.Printf("Launched browser directly: %s", path)
+				return nil
+			} else {
+				failures = append(failures, filepath.Base(path)+": "+err.Error())
+			}
+		}
+		if err := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", addr).Start(); err == nil {
+			log.Printf("Requested URL using Windows shell: %s", addr)
+			return nil
+		} else {
+			failures = append(failures, "rundll32: "+err.Error())
+		}
+		return fmt.Errorf("no browser could be launched: %s", strings.Join(failures, "; "))
 	}
 	for _, name := range []string{"xdg-open", "open"} {
 		if p, err := exec.LookPath(name); err == nil {
-			_ = exec.Command(p, addr).Start()
-			return
+			if err := exec.Command(p, addr).Start(); err == nil {
+				return nil
+			}
 		}
 	}
-	fmt.Println("Open this address:", addr)
+	return fmt.Errorf("no browser opener found; manually visit %s", addr)
+}
+func prepareLogging() {
+	path := ""
+	if base, err := os.UserCacheDir(); err == nil {
+		path = filepath.Join(base, "AussieTV", "startup.log")
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			path = ""
+		}
+	}
+	if path != "" {
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+		if err == nil {
+			log.SetOutput(io.MultiWriter(os.Stdout, f))
+			fmt.Printf("AussieTV startup log: %s\n", path)
+		} else {
+			fmt.Fprintf(os.Stderr, "Cannot write log %s: %v\n", path, err)
+		}
+	}
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+func startupFailure(err error) {
+	log.Printf("STARTUP FAILED: %v", err)
+	fmt.Fprintln(os.Stderr, "AussieTV couldn't start. The error is above.")
+	if runtime.GOOS == "windows" {
+		fmt.Fprintln(os.Stderr, "Press Enter to close this window...")
+		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+	}
+	os.Exit(1)
 }
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	prepareLogging()
+	log.Printf("AussieTV v1.1 starting on %s/%s", runtime.GOOS, runtime.GOARCH)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -439,17 +499,35 @@ func main() {
 			_ = server.Shutdown(ctx)
 		}()
 	})
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	// Use a predictable local URL for easier diagnosis and manual browser opening.
+	listener, err := net.Listen("tcp", "127.0.0.1:45781")
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Port 45781 unavailable (%v); trying a free port", err)
+		listener, err = net.Listen("tcp", "127.0.0.1:0")
+	}
+	if err != nil {
+		startupFailure(err)
 	}
 	server = &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	addr := "http://" + listener.Addr().String()
+	fmt.Println("-----------------------------------------------------------")
+	fmt.Println("AUSSIE TV IS STARTING")
+	fmt.Println("If the TV window doesn't open, paste this into your browser:")
+	fmt.Println("  " + addr)
+	fmt.Println("Keep this window open while watching TV.")
+	fmt.Println("-----------------------------------------------------------")
+	log.Println("AussieTV listening at", addr)
 	go heartbeatWatch()
-	go func() { time.Sleep(450 * time.Millisecond); openBrowser(addr) }()
-	log.Println("Aussie TV listening on", addr)
+	go func() {
+		time.Sleep(250 * time.Millisecond)
+		if err := openBrowser(addr); err != nil {
+			log.Printf("BROWSER LAUNCH FAILED: %v", err)
+			fmt.Printf("Open your browser manually at: %s\n", addr)
+		}
+	}()
 	err = server.Serve(listener)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Printf("Server failed: %v", err)
+		startupFailure(fmt.Errorf("server stopped unexpectedly: %w", err))
 	}
+	log.Println("AussieTV stopped")
 }
