@@ -2,6 +2,17 @@
 
 Historical source versions are preserved as separate commits and branches. These commits were imported from the original ChatGPT-produced source archives on 15 November 2026. Their history reflects version order, not the original local file creation times.
 
+## v1.3 (15 November 2026)
+- Save favourite channels locally in the browser, with Favourites filtering and visual markers in the EPG.
+- Add EPG directional navigation, preserve keyboard focus on guide redraw, and restore native Enter handling for active controls.
+- Replace repeated minute-long guide redraws with one redraw at the minute boundary.
+- Add a 35-second live playback startup timeout and limit media-error recovery attempts.
+- Harden localhost stream proxy: require indexed channel roots or backend-signed HLS subresources, block redirects/DNS targets to local and private addresses, and reject mismatched Host/Origin.
+- Expand Go security tests, check Chrome/Chromium guide interactions with mocked programme data, and retain the working v1.1 launcher.
+- The Windows binary cross-compiles, but native Windows and real broadcaster playback remain unverified.
+
+Source snapshot: [versions/v1.3](https://github.com/zidanerick/AussieTV/tree/versions/v1.3).
+
 ## v1.2 (15 November 2026)
 - Display broadcaster/channel logos from the channel feed in navigation and EPG.
 - Add quick-tune network buttons and channel branding.

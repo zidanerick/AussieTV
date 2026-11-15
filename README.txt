@@ -1,4 +1,4 @@
-AussieTV v1.2 - Live Australian Television for Windows
+AussieTV v1.3 - Live Australian Television for Windows
 ======================================================
 
 WHAT'S NEW IN V1.2
@@ -39,7 +39,7 @@ LIMITATIONS
   change or be blocked by network/region/provider requirements.
 - Some protected streams require the broadcaster's official player.
 - Video playback depends on the HLS.js library, which is loaded online.
-- v1.2 tested by Go unit tests and local HTTP server check. The executable
+- v1.3 tested by Go unit tests and local HTTP server check. The executable
   was cross-compiled for Windows x64, not exercised directly on Windows.
 - Your television and guide listings are supplied by https://i.mjh.nz/au/
   under the operator's availability and usage limitations.
@@ -55,3 +55,13 @@ Enter: Play selected channel
 F: Full-screen player
 
 No installer, admin rights, subscription, or bundled Python runtime required.
+
+
+NEW IN v1.3
+- Favourite channels are saved in your browser (select a channel then click Favourite).
+- Use the Favourites sidebar filter; it follows you across city regions by network/name.
+- Navigate guide cells with arrow keys and press Enter to tune; interactive buttons keep native keyboard behaviour.
+- Playback now reports a timeout instead of connecting indefinitely.
+- Stream proxy restricted to channel stream and signed resources from channel HLS manifests.
+
+The TV guide is community supplied, and actual Windows broadcaster streaming is not verified.

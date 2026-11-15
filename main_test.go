@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"net/http/httptest"
+	"time"
 	"io"
 	"net/http"
 	"strings"
@@ -109,4 +112,50 @@ func TestArtworkExactMatching(t *testing.T) {
 	if result.Poster != "" {
 		t.Fatalf("accepted the wrong programme: %+v", result)
 	}
+}
+
+func TestStreamProxyOnlyAllowsListedRootOrSignedManifestResources(t *testing.T) {
+    channel := Channel{ID: "channel-abc", Stream: "https://cdn.example.net/live/master.m3u8"}
+    if !permittedStream(channel, channel.Stream, "") {
+        t.Fatal("listed channel stream must be accepted without a signature")
+    }
+    segment := "https://media.example.org/path/segment01.ts?auth=shortlived"
+    if permittedStream(channel, segment, "") {
+        t.Fatal("arbitrary untrusted segment was accepted")
+    }
+    signature := streamSignature(channel.ID, segment)
+    if !permittedStream(channel, segment, signature) {
+        t.Fatal("valid signed manifest resource was rejected")
+    }
+    if permittedStream(channel, segment+"&extra=1", signature) || permittedStream(Channel{ID: "channel-other"}, segment, signature) {
+        t.Fatal("signature was reusable against a different URL or channel")
+    }
+    if permittedStream(channel, segment, "NOT-HEX") {
+        t.Fatal("nonhex signature was accepted")
+    }
+    if link := playlistURL(channel.ID, segment); !strings.Contains(link, "&sig=") {
+        t.Fatalf("playlist proxy URL is unsigned: %s", link)
+    }
+}
+
+func TestHLSProxyRejectsUnlistedStreamBeforeFetching(t *testing.T) {
+    cacheMu.Lock()
+    old := cache
+    cache = map[string]cacheEntry{"Test": {data: ChannelData{Channels: []Channel{{ID: "abc", Stream: "https://example.org/master.m3u8"}}}}}
+    cacheMu.Unlock()
+    defer func() { cacheMu.Lock(); cache = old; cacheMu.Unlock() }()
+    request := httptest.NewRequest(http.MethodGet, "/hls?ch=abc&u=https%3A%2F%2Fexample.org%2Fforged.ts", nil)
+    result := httptest.NewRecorder()
+    hlsHandler(result, request)
+    if result.Code != http.StatusForbidden {
+        t.Fatalf("got HTTP %d, want 403 for forged address", result.Code)
+    }
+}
+
+func TestSafeDialRejectsPrivateHostBeforeConnecting(t *testing.T) {
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    defer cancel()
+    conn, err := safeDial(ctx, "tcp", "localhost:80")
+    if conn != nil { conn.Close(); t.Fatal("should not connect to localhost") }
+    if err == nil { t.Fatal("did not reject localhost resolution") }
 }

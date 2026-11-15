@@ -2,7 +2,7 @@
 
 A lightweight, portable Windows 10/11 application for watching Australian free-to-air TV streams with a television-style electronic programme guide (EPG).
 
-**Current source version: v1.2.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
+**Current source version: v1.3.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
 
 ## Run
 
@@ -18,6 +18,9 @@ If your browser does not open, visit `http://127.0.0.1:45781`. If the port is oc
 - Default region Melbourne, with other major Australian capital-city regions available
 - Network/channel logos from the guide provider
 - Optional TV programme posters from TVmaze, with attribution and strict title matching
+- Saved favourites with a dedicated filter, keyboard/remote-like EPG navigation, and guide focus preservation
+- Visible playback timeout and single-recovery limit for HLS media errors
+- Proxy hardening: stream URL signatures, DNS/IP checks, redirects and localhost Host/Origin validation
 - Single localhost-bound server with embedded web UI, no external installation
 
 ## Build from source
@@ -42,6 +45,7 @@ Package `AussieTV.exe`, `RUN-AussieTV.cmd`, and `README.txt` together. GitHub Ac
 | v1.0 | [versions/v1.0](https://github.com/zidanerick/AussieTV/tree/versions/v1.0) | First programme guide and channel player |
 | v1.1 | [versions/v1.1](https://github.com/zidanerick/AussieTV/tree/versions/v1.1) | Visible launcher, startup logs, browser-opening fixes |
 | v1.2 | [versions/v1.2](https://github.com/zidanerick/AussieTV/tree/versions/v1.2) | Real channel logos, programme posters, updated guide |
+| v1.3 | [versions/v1.3](https://github.com/zidanerick/AussieTV/tree/versions/v1.3) | Favourites, remote-style guide navigation, playback timeout and stream proxy safeguards |
 
 Full details: [CHANGELOG.md](CHANGELOG.md).
 
@@ -49,7 +53,7 @@ Full details: [CHANGELOG.md](CHANGELOG.md).
 
 AussieTV does not operate or own television streams. The channel index and guide come from [i.mjh.nz](https://i.mjh.nz/au/), which can change or be unavailable. Browser-based HLS playback also depends on an externally loaded HLS.js library. Some broadcasters restrict streams using authentication, DRM or region rules: use the supplied official broadcaster links in those cases. TVmaze art is optional and won't match all programmes. Melbourne listings may differ from Gippsland local feeds.
 
-**Validation:** Source unit tests and a cross-compiled Windows executable were checked in a Linux environment. Actual TV playback and full Windows UI behaviour have not been independently verified in a native Windows test.
+**Validation:** Go tests, race detector, Windows cross-compilation, localhost HTTP checks, and headless Chromium UI interaction checks (with mocked channel data) passed in Linux. Actual free-to-air stream playback, Windows launcher behaviour for v1.3 and the Windows UI have not been independently verified on a Windows PC. Saved favourites use browser localStorage for this application's local address.
 
 ## Working on this project in a future chat
 

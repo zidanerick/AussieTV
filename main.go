@@ -3,6 +3,11 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -28,7 +33,7 @@ import (
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
-const version = "1.2"
+const version = "1.3"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -81,10 +86,60 @@ var client = &http.Client{Timeout: 24 * time.Second, Transport: &http.Transport{
 	Proxy: http.ProxyFromEnvironment, MaxIdleConns: 50, MaxIdleConnsPerHost: 12, IdleConnTimeout: 65 * time.Second,
 	TLSHandshakeTimeout: 12 * time.Second, ResponseHeaderTimeout: 20 * time.Second,
 }}
-var mediaClient = &http.Client{Timeout: 0, Transport: &http.Transport{
-	Proxy: http.ProxyFromEnvironment, MaxIdleConns: 80, MaxIdleConnsPerHost: 24,
-	IdleConnTimeout: 45 * time.Second, TLSHandshakeTimeout: 12 * time.Second, ResponseHeaderTimeout: 25 * time.Second,
+// Each install's local HLS proxy only accepts the indexed channel's root URL,
+// or URLs that the backend itself rewrote from an upstream HLS manifest.
+var streamKey [32]byte
+
+func init() {
+    if _, err := rand.Read(streamKey[:]); err != nil {
+        panic("cannot initialize the stream proxy secret: " + err.Error())
+    }
+}
+
+func safeDial(ctx context.Context, network, address string) (net.Conn, error) {
+    host, port, err := net.SplitHostPort(address)
+    if err != nil { return nil, err }
+    lookupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+    defer cancel()
+    ips, err := net.DefaultResolver.LookupIPAddr(lookupCtx, host)
+    if err != nil { return nil, err }
+    // Do not permit DNS names to resolve to LAN, loopback or metadata targets.
+    var dialer net.Dialer
+    for _, target := range ips {
+        ip := target.IP
+        if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() { continue }
+        conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+        if dialErr == nil { return conn, nil }
+        err = dialErr
+    }
+    if err == nil { err = errors.New("stream target resolves only to blocked IP addresses") }
+    return nil, err
+}
+
+var mediaClient = &http.Client{Timeout: 0, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+    if len(via) >= 10 { return errors.New("too many stream redirects") }
+    _, err := validateRemote(req.URL.String())
+    return err
+}, Transport: &http.Transport{
+    // Avoid a system proxy bypassing the remote IP restrictions.
+    DialContext: safeDial, MaxIdleConns: 80, MaxIdleConnsPerHost: 24,
+    IdleConnTimeout: 45 * time.Second, TLSHandshakeTimeout: 12 * time.Second, ResponseHeaderTimeout: 25 * time.Second,
 }}
+
+func streamSignature(channelID, remote string) string {
+    mac := hmac.New(sha256.New, streamKey[:])
+    _, _ = io.WriteString(mac, channelID+"\n"+remote)
+    return hex.EncodeToString(mac.Sum(nil))
+}
+func permittedStream(ch Channel, remote, signature string) bool {
+    if ch.Stream != "" && remote == ch.Stream { return true }
+    if signature == "" { return false }
+    provided, err := hex.DecodeString(signature)
+    if err != nil { return false }
+    mac := hmac.New(sha256.New, streamKey[:])
+    _, _ = io.WriteString(mac, ch.ID+"\n"+remote)
+    return subtle.ConstantTimeCompare(mac.Sum(nil), provided) == 1
+}
 
 type cacheEntry struct {
 	data ChannelData
@@ -150,7 +205,7 @@ func lookupArtwork(title string) Artwork {
 	if err != nil {
 		return empty
 	}
-	req.Header.Set("User-Agent", "AussieTV/1.2 personal TV guide (TVmaze artwork attribution)")
+	req.Header.Set("User-Agent", "AussieTV/1.3 personal TV guide (TVmaze artwork attribution)")
 	response, err := artworkClient.Do(req)
 	if err != nil {
 		log.Printf("programme art lookup: %v", err)
@@ -223,7 +278,7 @@ func loadChannels(region string) ChannelData {
 		return old.data
 	}
 	req, _ := http.NewRequest("GET", sourceBase+region+"/tv.json", nil)
-	req.Header.Set("User-Agent", "AussieTV/1.0 (+personal local player)")
+	req.Header.Set("User-Agent", "AussieTV/1.3 (+personal local player)")
 	response, err := client.Do(req)
 	if err == nil && response.StatusCode != 200 {
 		err = fmt.Errorf("EPG server HTTP %d", response.StatusCode)
@@ -342,7 +397,7 @@ func jsonResponse(w http.ResponseWriter, val any) {
 }
 func markPing() { hadPing.Store(true); lastPing.Store(time.Now().Unix()) }
 func playlistURL(chID, remote string) string {
-	return "/hls?ch=" + url.QueryEscape(chID) + "&u=" + url.QueryEscape(remote)
+	return "/hls?ch=" + url.QueryEscape(chID) + "&u=" + url.QueryEscape(remote) + "&sig=" + streamSignature(chID, remote)
 }
 func validateRemote(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
@@ -367,8 +422,6 @@ func hlsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// A channel ID from the current source is required; arbitrary local HTTP proxying is not supported.
-	region := safeRegion(r.URL.Query().Get("region"))
-	_ = region
 	var found *Channel
 	cacheMu.Lock()
 	for _, v := range cache {
@@ -386,6 +439,10 @@ func hlsHandler(w http.ResponseWriter, r *http.Request) {
 	cacheMu.Unlock()
 	if found == nil {
 		http.Error(w, "Refresh channel listings and try again", 404)
+		return
+	}
+	if !permittedStream(*found, raw, r.URL.Query().Get("sig")) {
+		http.Error(w, "Stream address not authorised for this channel", 403)
 		return
 	}
 	req, err := http.NewRequestWithContext(r.Context(), "GET", u.String(), nil)
@@ -620,7 +677,24 @@ func main() {
 	if err != nil {
 		startupFailure(err)
 	}
-	server = &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	server = &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The application is bound to loopback. Reject other Host headers to
+		// prevent DNS-rebinding access from unrelated web origins.
+		host := r.Host
+		if h, _, err := net.SplitHostPort(host); err == nil { host = h }
+		if host != "127.0.0.1" && host != "localhost" {
+			http.Error(w, "Invalid local host", http.StatusForbidden)
+			return
+		}
+		if origin := r.Header.Get("Origin"); origin != "" {
+			u, err := url.Parse(origin)
+			if err != nil || u.Host != r.Host || u.Scheme != "http" {
+				http.Error(w, "Invalid request origin", http.StatusForbidden)
+				return
+			}
+		}
+		mux.ServeHTTP(w, r)
+	}), ReadHeaderTimeout: 10 * time.Second}
 	addr := "http://" + listener.Addr().String()
 	fmt.Println("-----------------------------------------------------------")
 	fmt.Println("AUSSIE TV IS STARTING")
