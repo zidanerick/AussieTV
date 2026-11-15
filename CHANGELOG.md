@@ -10,7 +10,7 @@ Historical source versions are preserved as separate commits and branches. These
 - Preserve the v1.1 launcher and diagnostics.
 - Unit tests expanded for artwork matching and image URL validation.
 
-Source snapshot: [versions/v1.2](../../tree/versions/v1.2).
+Source snapshot: [versions/v1.2](https://github.com/zidanerick/AussieTV/tree/versions/v1.2).
 
 ## v1.1 (15 November 2026)
 - Fix silent startup failure by retaining a visible console.
@@ -18,7 +18,7 @@ Source snapshot: [versions/v1.2](../../tree/versions/v1.2).
 - Make opening the default browser more resilient.
 - Keep local server loopback-only and print alternate port if occupied.
 
-Source snapshot: [versions/v1.1](../../tree/versions/v1.1).
+Source snapshot: [versions/v1.1](https://github.com/zidanerick/AussieTV/tree/versions/v1.1).
 
 ## v1.0 (15 November 2026)
 - Initial Windows TV interface, guide, stream playback and main Australian broadcaster/channel filter.
@@ -26,7 +26,7 @@ Source snapshot: [versions/v1.1](../../tree/versions/v1.1).
 - Go localhost HTTP server and embedded HTML/JavaScript frontend.
 - Initial Go tests.
 
-Source snapshot: [versions/v1.0](../../tree/versions/v1.0).
+Source snapshot: [versions/v1.0](https://github.com/zidanerick/AussieTV/tree/versions/v1.0).
 
 ## Future versions
 
