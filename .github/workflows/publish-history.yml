@@ -1,0 +1,78 @@
+name: Publish historical Windows builds
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-history.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  historical:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: v1.0
+            source_sha: 681b9aa580f0ac5f2ff961f2804c654866631391
+          - version: v1.1
+            source_sha: c78cc5a2a3674bedd0277dadbd9771b4fe5ad8e3
+          - version: v1.2
+            source_sha: 72bc93cb9d55aa4b2a7db9bc603df52c9cb3e1c9
+
+    steps:
+      - name: Check out exact historical source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.source_sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test and build historical Windows executable
+        shell: pwsh
+        run: |
+          $env:GOOS = 'windows'
+          $env:GOARCH = 'amd64'
+          $env:CGO_ENABLED = '0'
+          go test ./... -count=1
+          if ($LASTEXITCODE -ne 0) { throw "Go tests failed" }
+          go build -trimpath -ldflags="-s -w" -o AussieTV.exe .
+          if ($LASTEXITCODE -ne 0) { throw "Go build failed" }
+
+      - name: Package historical version
+        shell: pwsh
+        env:
+          HISTORICAL_VERSION: ${{ matrix.version }}
+        run: |
+          $files = @('AussieTV.exe')
+          if (Test-Path 'RUN-AussieTV.cmd') { $files += 'RUN-AussieTV.cmd' }
+          if (Test-Path 'README.txt') { $files += 'README.txt' }
+          if (Test-Path 'README-v1.1.txt') { $files += 'README-v1.1.txt' }
+          $zip = "AussieTV-Windows-$env:HISTORICAL_VERSION.zip"
+          Compress-Archive -Path $files -DestinationPath $zip -Force
+          Get-FileHash $zip -Algorithm SHA256 | Format-List
+
+      - name: Create archived GitHub prerelease (unless it already exists)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HISTORICAL_VERSION: ${{ matrix.version }}
+          HISTORICAL_SHA: ${{ matrix.source_sha }}
+        run: |
+          $tag = $env:HISTORICAL_VERSION
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $tag already exists. Preserving it without overwriting."
+            exit 0
+          }
+          $zip = "AussieTV-Windows-$tag.zip"
+          $notes = "Historical source version $tag rebuilt by GitHub Actions from exact commit $env:HISTORICAL_SHA. This unsigned Windows build is a prerelease. Native Windows playback and availability of third-party TV streams are not guaranteed. This archive is rebuilt from source, not a byte-for-byte copy of the earlier ChatGPT attachment."
+          gh release create $tag $zip --repo $env:GITHUB_REPOSITORY --target $env:HISTORICAL_SHA --title "AussieTV $tag (historical)" --notes $notes --prerelease
+          if ($LASTEXITCODE -ne 0) { throw "GitHub release creation failed" }
