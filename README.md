@@ -6,7 +6,7 @@ A lightweight, portable Windows 10/11 application for watching Australian free-t
 
 ## Run
 
-Download a **Windows build artifact** from the latest successful [GitHub Actions build](../../actions/workflows/windows-build.yml) or build from source. Extract the ZIP and run `RUN-AussieTV.cmd` while keeping the console open.
+Download a **Windows build artifact** from the latest successful [GitHub Actions build](https://github.com/zidanerick/AussieTV/actions/workflows/windows-build.yml) or build from source. Extract the ZIP and run `RUN-AussieTV.cmd` while keeping the console open.
 
 If your browser does not open, visit `http://127.0.0.1:45781`. If the port is occupied, use the alternate address printed by the application. Logs are written to `%LOCALAPPDATA%\AussieTV\startup.log`.
 
@@ -39,9 +39,9 @@ Package `AussieTV.exe`, `RUN-AussieTV.cmd`, and `README.txt` together. GitHub Ac
 
 | Version | Historical snapshot | Highlights |
 | --- | --- | --- |
-| v1.0 | [versions/v1.0](../../tree/versions/v1.0) | First programme guide and channel player |
-| v1.1 | [versions/v1.1](../../tree/versions/v1.1) | Visible launcher, startup logs, browser-opening fixes |
-| v1.2 | [versions/v1.2](../../tree/versions/v1.2) | Real channel logos, programme posters, updated guide |
+| v1.0 | [versions/v1.0](https://github.com/zidanerick/AussieTV/tree/versions/v1.0) | First programme guide and channel player |
+| v1.1 | [versions/v1.1](https://github.com/zidanerick/AussieTV/tree/versions/v1.1) | Visible launcher, startup logs, browser-opening fixes |
+| v1.2 | [versions/v1.2](https://github.com/zidanerick/AussieTV/tree/versions/v1.2) | Real channel logos, programme posters, updated guide |
 
 Full details: [CHANGELOG.md](CHANGELOG.md).
 
