@@ -1,0 +1,51 @@
+name: Windows build and tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run unit tests
+        run: go test ./... -count=1 -v
+
+      - name: Build Windows x64 executable
+        shell: pwsh
+        run: |
+          $env:GOOS = 'windows'
+          $env:GOARCH = 'amd64'
+          $env:CGO_ENABLED = '0'
+          go build -trimpath -ldflags="-s -w" -o AussieTV.exe .
+          if ($LASTEXITCODE -ne 0) { throw "go build failed" }
+
+      - name: Package portable app
+        shell: pwsh
+        run: |
+          Compress-Archive -Path AussieTV.exe,RUN-AussieTV.cmd,README.txt -DestinationPath AussieTV-Windows.zip -Force
+          Get-FileHash AussieTV-Windows.zip -Algorithm SHA256 | Format-List
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: AussieTV-Windows-x64
+          path: AussieTV-Windows.zip
+          if-no-files-found: error
+          retention-days: 90

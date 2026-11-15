@@ -1,0 +1,33 @@
+# Changelog
+
+Historical source versions are preserved as separate commits and branches. These commits were imported from the original ChatGPT-produced source archives on 15 November 2026. Their history reflects version order, not the original local file creation times.
+
+## v1.2 (15 November 2026)
+- Display broadcaster/channel logos from the channel feed in navigation and EPG.
+- Add quick-tune network buttons and channel branding.
+- Look up optional programme posters on TVmaze using strict programme-title matching.
+- Show poster artwork as an idle background with fallback branded tiles.
+- Preserve the v1.1 launcher and diagnostics.
+- Unit tests expanded for artwork matching and image URL validation.
+
+Source snapshot: [versions/v1.2](../../tree/versions/v1.2).
+
+## v1.1 (15 November 2026)
+- Fix silent startup failure by retaining a visible console.
+- Add `RUN-AussieTV.cmd`, log file, and fallback browser address.
+- Make opening the default browser more resilient.
+- Keep local server loopback-only and print alternate port if occupied.
+
+Source snapshot: [versions/v1.1](../../tree/versions/v1.1).
+
+## v1.0 (15 November 2026)
+- Initial Windows TV interface, guide, stream playback and main Australian broadcaster/channel filter.
+- Default Melbourne guide plus configurable major-city region.
+- Go localhost HTTP server and embedded HTML/JavaScript frontend.
+- Initial Go tests.
+
+Source snapshot: [versions/v1.0](../../tree/versions/v1.0).
+
+## Future versions
+
+For every change: update this changelog; bump the app version in `main.go`, launcher and README; maintain `docs/CONTINUITY.md`; use pull requests for review. GitHub Actions produces Windows build artifacts for commits to main.

@@ -1,0 +1,14 @@
+# Executables and Windows build archives
+*.exe
+*.zip
+*.test
+*.out
+dist/
+build/
+
+# OS, editor and local logs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
