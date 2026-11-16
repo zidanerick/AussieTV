@@ -2,7 +2,7 @@
 
 A lightweight, portable Windows 10/11 application for watching Australian free-to-air TV streams with a television-style electronic programme guide (EPG).
 
-**Current source version: v1.3.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
+**Current source version: v1.4.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
 
 ## Run
 
@@ -16,6 +16,7 @@ If your browser does not open, visit `http://127.0.0.1:45781`. If the port is oc
 - Television grid guide, channel selection, programme descriptions and shortcuts
 - Direct HLS playback where available, plus links to official network live players
 - Default region Melbourne, with other major Australian capital-city regions available
+- Original AussieTV icon, wordmark, favicon and browser install icon
 - Network/channel logos from the guide provider
 - Optional TV programme posters from TVmaze, with attribution and strict title matching
 - Saved favourites with a dedicated filter, keyboard/remote-like EPG navigation, and guide focus preservation
@@ -26,6 +27,7 @@ If your browser does not open, visit `http://127.0.0.1:45781`. If the port is oc
 ## Build from source
 
 ```bash
+go run ./tools/iconbuilder
 go test ./...
 go build -o AussieTV.exe .
 ```
@@ -33,10 +35,11 @@ go build -o AussieTV.exe .
 On Linux, cross-compile for Windows x64 with:
 
 ```bash
+go run ./tools/iconbuilder
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o AussieTV.exe .
 ```
 
-Package `AussieTV.exe`, `RUN-AussieTV.cmd`, and `README.txt` together. GitHub Actions automates the build and packaging on `main`.
+Package `AussieTV.exe`, `RUN-AussieTV.cmd`, `README.txt` and `assets/AussieTV.ico` together. The ICO is for shortcuts; the browser and installed-site identity use the embedded favicon files. GitHub Actions automates the build and packaging on `main`.
 
 ## Version history
 
@@ -46,6 +49,7 @@ Package `AussieTV.exe`, `RUN-AussieTV.cmd`, and `README.txt` together. GitHub Ac
 | v1.1 | [versions/v1.1](https://github.com/zidanerick/AussieTV/tree/versions/v1.1) | Visible launcher, startup logs, browser-opening fixes |
 | v1.2 | [versions/v1.2](https://github.com/zidanerick/AussieTV/tree/versions/v1.2) | Real channel logos, programme posters, updated guide |
 | v1.3 | [versions/v1.3](https://github.com/zidanerick/AussieTV/tree/versions/v1.3) | Favourites, remote-style guide navigation, playback timeout and stream proxy safeguards |
+| v1.4 | [main](https://github.com/zidanerick/AussieTV) | Original app logo, browser favicon, multi-size Windows shortcut icon and brand asset tooling |
 
 Full details: [CHANGELOG.md](CHANGELOG.md).
 
@@ -61,4 +65,4 @@ Begin with [docs/CONTINUITY.md](docs/CONTINUITY.md) and [AGENTS.md](AGENTS.md). 
 
 ## Attribution
 
-Network marks and TV programme art belong to their respective owners. TVmaze API artwork is attributed in the application. Project license: see [LICENSE](LICENSE).
+The AussieTV logo is original artwork. Network marks and TV programme art belong to their respective owners. TVmaze API artwork is attributed in the application. Project license: see [LICENSE](LICENSE).

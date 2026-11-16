@@ -14,3 +14,5 @@
 
 12. Preserve v1.3 favourite/guide interactions, trusted stream-root policy, signed HLS subresources, redirect and DNS checks; exercise security regression tests before changing streaming code.
 13. Do not confuse headless Chromium with real Windows/browser playback validation. Track unverified streams in issue #1.
+
+14. For branding edits, keep SVG and generated PNG/ICO visuals consistent. Run `go run ./tools/iconbuilder` before build/test and preserve working broadcaster logos.

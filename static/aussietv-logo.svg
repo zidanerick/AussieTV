@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 128" role="img" aria-labelledby="title">
+<title id="title">AussieTV</title>
+<g transform="translate(1 0)">
+<g fill="none" stroke="#102965" stroke-linecap="round" stroke-width="10"><path d="M56 40 36 19M72 40 92 19"/></g><circle cx="35" cy="18" r="8" fill="#102965"/><circle cx="93" cy="18" r="8" fill="#102965"/><path d="M36 108 30 119M92 108 98 119" fill="none" stroke="#102965" stroke-width="12" stroke-linecap="round"/><rect x="9" y="35" width="110" height="80" rx="19" fill="#102965" stroke="#26519B" stroke-width="1.5"/><path d="M69 50 Q95 38 110 49 L110 66 Q96 51 69 50Z" fill="#FFCB40"/><path d="M43 54 Q43 49 48 50 L92 75 Q97 78 92 82 L48 105 Q43 107 43 101Z" fill="#14E2C7"/>
+</g>
+<text x="145" y="90" font-size="77" font-family="Segoe UI,Arial,sans-serif" font-weight="800" letter-spacing="-3" fill="#f3f7ff">Aussie<tspan fill="#14E2C7">TV</tspan></text>
+</svg>

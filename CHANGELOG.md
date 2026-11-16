@@ -2,6 +2,14 @@
 
 Historical source versions are preserved as separate commits and branches. These commits were imported from the original ChatGPT-produced source archives on 15 November 2026. Their history reflects version order, not the original local file creation times.
 
+## v1.4 (16 November 2026)
+- Introduce an original AussieTV brandmark and wordmark, separate from broadcasters' copyrighted channel marks.
+- Replace the placeholder sidebar glyph and idle-player symbol with the new project icon.
+- Serve SVG favicon, PNG favicons, multi-size ICO and a site manifest through allow-listed local asset routes.
+- Add a dependency-free Go icon builder and package `AussieTV.ico` for Windows shortcuts.
+- Add route tests, generate icons in GitHub Actions and document the branding source.
+- This version changes branding only; real-stream and native Windows validation remain separate.
+
 ## v1.3 (15 November 2026)
 - Save favourite channels locally in the browser, with Favourites filtering and visual markers in the EPG.
 - Add EPG directional navigation, preserve keyboard focus on guide redraw, and restore native Enter handling for active controls.

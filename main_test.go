@@ -159,3 +159,24 @@ func TestSafeDialRejectsPrivateHostBeforeConnecting(t *testing.T) {
     if conn != nil { conn.Close(); t.Fatal("should not connect to localhost") }
     if err == nil { t.Fatal("did not reject localhost resolution") }
 }
+
+// Branding assets must be embedded in the executable and correctly typed.
+func TestAppBrandingRoutes(t *testing.T) {
+	cases := map[string]string{
+		"/": "text/html", "/app-icon.svg": "image/svg+xml",
+		"/aussietv-logo.svg": "image/svg+xml",
+		"/favicon-32.png": "image/png", "/favicon-192.png": "image/png",
+		"/favicon.ico": "image/x-icon",
+		"/site.webmanifest": "application/manifest+json",
+	}
+	for path, typ := range cases {
+		w := httptest.NewRecorder()
+		serveAppAsset(w, httptest.NewRequest(http.MethodGet, path, nil))
+		if w.Code != http.StatusOK { t.Errorf("GET %s status: %d", path, w.Code); continue }
+		if got := w.Header().Get("Content-Type"); !strings.HasPrefix(got,typ) { t.Errorf("GET %s content type: %s", path, got) }
+		if w.Body.Len()==0 { t.Errorf("GET %s empty", path) }
+	}
+	w:=httptest.NewRecorder()
+	serveAppAsset(w,httptest.NewRequest(http.MethodGet, "/not-a-route",nil))
+	if w.Code!=http.StatusNotFound {t.Fatalf("unexpected route accepted: %d",w.Code)}
+}
