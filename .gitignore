@@ -18,3 +18,6 @@ static/favicon-32.png
 static/favicon-192.png
 static/favicon.ico
 assets/AussieTV.ico
+
+# Generated executable icon resource for Windows Go linker
+rsrc_windows_amd64.syso

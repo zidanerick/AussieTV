@@ -24,7 +24,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Generate brand icons
+      - name: Generate icons and embedded Windows resource
         run: go run ./tools/iconbuilder
 
       - name: Run unit tests
@@ -42,7 +42,8 @@ jobs:
       - name: Package portable app
         shell: pwsh
         run: |
-          Compress-Archive -Path AussieTV.exe,RUN-AussieTV.cmd,README.txt,assets/AussieTV.ico -DestinationPath AussieTV-Windows.zip -Force
+          Copy-Item assets/AussieTV.ico ./AussieTV.ico
+          Compress-Archive -Path AussieTV.exe,RUN-AussieTV.cmd,README.txt,AussieTV.ico -DestinationPath AussieTV-Windows.zip -Force
           Get-FileHash AussieTV-Windows.zip -Algorithm SHA256 | Format-List
 
       - name: Upload Windows package

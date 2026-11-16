@@ -180,3 +180,14 @@ func TestAppBrandingRoutes(t *testing.T) {
 	serveAppAsset(w,httptest.NewRequest(http.MethodGet, "/not-a-route",nil))
 	if w.Code!=http.StatusNotFound {t.Fatalf("unexpected route accepted: %d",w.Code)}
 }
+
+func TestWindowsBrowserCandidatesHaveBrowserExecutables(t *testing.T) {
+ t.Setenv("ProgramFiles(x86)","C:/Program Files (x86)")
+ t.Setenv("ProgramFiles","C:/Program Files")
+ t.Setenv("LOCALAPPDATA","C:/Users/Test/AppData/Local")
+ paths:=windowsBrowserCandidates()
+ if len(paths)!=6 {t.Fatalf("want 6 Edge/Chrome candidates, got %d: %v",len(paths),paths)}
+ for _,p:=range paths {
+  if !strings.HasSuffix(strings.ToLower(p),"msedge.exe") && !strings.HasSuffix(strings.ToLower(p),"chrome.exe") {t.Fatalf("unexpected browser: %s",p)}
+ }
+}

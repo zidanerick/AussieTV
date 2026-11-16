@@ -9,6 +9,6 @@ The project icon and wordmark are original AussieTV artwork. The icon combines a
 
 Run `go run ./tools/iconbuilder` before a distributable build. The GitHub Actions workflow generates these files before tests and compilation. The files are intentionally ignored by Git.
 
-The Windows ICO is distributed alongside the EXE and can be assigned to a shortcut manually. Embedding the icon in PE resources is a separate enhancement.
+The Windows ICO is distributed alongside the EXE and can be assigned to a shortcut manually. As of v1.5, the icon is also embedded in the Windows executable using the generated `rsrc_windows_amd64.syso` COFF resource. It contains seven sizes. No windres or third-party build tools are required.
 
 Do not incorporate network broadcaster logos into the AussieTV application icon.

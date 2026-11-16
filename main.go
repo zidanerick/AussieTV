@@ -33,7 +33,7 @@ import (
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
-const version = "1.4"
+const version = "1.5"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -205,7 +205,7 @@ func lookupArtwork(title string) Artwork {
 	if err != nil {
 		return empty
 	}
-	req.Header.Set("User-Agent", "AussieTV/1.3 personal TV guide (TVmaze artwork attribution)")
+	req.Header.Set("User-Agent", "AussieTV/1.5 personal TV guide (TVmaze artwork attribution)")
 	response, err := artworkClient.Do(req)
 	if err != nil {
 		log.Printf("programme art lookup: %v", err)
@@ -278,7 +278,7 @@ func loadChannels(region string) ChannelData {
 		return old.data
 	}
 	req, _ := http.NewRequest("GET", sourceBase+region+"/tv.json", nil)
-	req.Header.Set("User-Agent", "AussieTV/1.3 (+personal local player)")
+	req.Header.Set("User-Agent", "AussieTV/1.5 (+personal local player)")
 	response, err := client.Do(req)
 	if err == nil && response.StatusCode != 200 {
 		err = fmt.Errorf("EPG server HTTP %d", response.StatusCode)
@@ -536,62 +536,54 @@ func heartbeatWatch() {
 		}
 	}
 }
-func openBrowser(addr string) error {
-	if os.Getenv("AUSSIE_TV_NO_BROWSER") == "1" {
-		log.Print("Automatic browser launch disabled for testing")
-		return nil
-	}
-	if runtime.GOOS == "windows" {
-		// Prefer the Windows URL association. Unlike hard-coded browser paths this
-		// supports custom browser installs and Microsoft Store browser packages.
-		var failures []string
-		for _, args := range [][]string{
-			{"/c", "start", "", addr},
-		} {
-			if err := exec.Command("cmd.exe", args...).Start(); err == nil {
-				log.Printf("Requested Windows default browser: %s", addr)
-				return nil
-			} else {
-				failures = append(failures, "cmd/start: "+err.Error())
-			}
-		}
-		// Edge and Chrome app mode are fallbacks, not prerequisites.
-		paths := []string{}
-		for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"} {
-			if base := os.Getenv(env); base != "" {
-				paths = append(paths,
-					filepath.Join(base, "Microsoft", "Edge", "Application", "msedge.exe"),
-					filepath.Join(base, "Google", "Chrome", "Application", "chrome.exe"))
-			}
-		}
-		for _, path := range paths {
-			if _, err := os.Stat(path); err != nil {
-				continue
-			}
-			if err := exec.Command(path, "--app="+addr, "--window-size=1360,900").Start(); err == nil {
-				log.Printf("Launched browser directly: %s", path)
-				return nil
-			} else {
-				failures = append(failures, filepath.Base(path)+": "+err.Error())
-			}
-		}
-		if err := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", addr).Start(); err == nil {
-			log.Printf("Requested URL using Windows shell: %s", addr)
-			return nil
-		} else {
-			failures = append(failures, "rundll32: "+err.Error())
-		}
-		return fmt.Errorf("no browser could be launched: %s", strings.Join(failures, "; "))
-	}
-	for _, name := range []string{"xdg-open", "open"} {
-		if p, err := exec.LookPath(name); err == nil {
-			if err := exec.Command(p, addr).Start(); err == nil {
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("no browser opener found; manually visit %s", addr)
+// Browser candidates are deliberately limited to installed Edge and Chrome.
+func windowsBrowserCandidates() []string {
+ paths:=[]string{}
+ seen:=map[string]bool{}
+ for _,env:=range []string{"ProgramFiles(x86)","ProgramFiles","LOCALAPPDATA"} {
+  if base:=os.Getenv(env);base!="" {
+   for _,p:=range []string{
+    filepath.Join(base,"Microsoft","Edge","Application","msedge.exe"),
+    filepath.Join(base,"Google","Chrome","Application","chrome.exe"),
+   } {
+    key:=strings.ToLower(p)
+    if !seen[key] {seen[key]=true;paths=append(paths,p)}
+   }
+  }
+ }
+ return paths
 }
+func openBrowser(addr string) error {
+ if os.Getenv("AUSSIE_TV_NO_BROWSER")=="1" {log.Print("Automatic browser launch disabled for testing");return nil}
+ if runtime.GOOS=="windows" {
+  var failures []string
+  // App-mode has a separate window without a browser address bar. Users can
+  // select AUSSIE_TV_BROWSER_MODE=default to use normal browser tabs.
+  if !strings.EqualFold(os.Getenv("AUSSIE_TV_BROWSER_MODE"),"default") {
+   for _,path:=range windowsBrowserCandidates() {
+    if stat,err:=os.Stat(path);err!=nil||stat.IsDir(){continue}
+    if err:=exec.Command(path,"--app="+addr,"--window-size=1360,900").Start();err==nil{
+     log.Printf("Launched dedicated browser app window: %s",path);return nil
+    } else {failures=append(failures,filepath.Base(path)+": "+err.Error())}
+   }
+  }
+  // Keep the v1.1 system-default and Windows-shell fallbacks.
+  if err:=exec.Command("cmd.exe","/c","start","",addr).Start();err==nil{
+   log.Printf("Requested Windows default browser: %s",addr);return nil
+  } else {failures=append(failures,"cmd/start: "+err.Error())}
+  if err:=exec.Command("rundll32.exe","url.dll,FileProtocolHandler",addr).Start();err==nil{
+   log.Printf("Requested URL using Windows shell: %s",addr);return nil
+  } else {failures=append(failures,"rundll32: "+err.Error())}
+  return fmt.Errorf("no browser could be launched: %s",strings.Join(failures,"; "))
+ }
+ for _,name:=range []string{"xdg-open","open"} {
+  if p,err:=exec.LookPath(name);err==nil {
+   if err:=exec.Command(p,addr).Start();err==nil{return nil}
+  }
+ }
+ return fmt.Errorf("no browser opener found; manually visit %s",addr)
+}
+
 func prepareLogging() {
 	path := ""
 	if base, err := os.UserCacheDir(); err == nil {
