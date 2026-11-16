@@ -1,4 +1,4 @@
-AussieTV v1.4 - Live Australian Television for Windows
+AussieTV v1.5 - Live Australian Television for Windows
 ======================================================
 
 WHAT'S NEW IN V1.2
@@ -12,7 +12,8 @@ WHAT'S NEW IN V1.2
 RUNNING ON WINDOWS 10/11
 1. Extract the complete ZIP to a folder.
 2. Double-click RUN-AussieTV.cmd (recommended), or AussieTV.exe.
-3. A browser window should appear. If not, open:
+3. An Edge/Chrome app-style window opens when available. Otherwise the
+   normal default browser opens. If no window appears, visit:
    http://127.0.0.1:45781
 4. Keep the command window running while watching TV.
 5. Select a channel in the guide or use the five large quick-tune buttons.
@@ -71,3 +72,11 @@ NEW IN v1.4
 - Browser favicon, install icon and local site manifest.
 - Multi-size AussieTV.ico included in the Windows ZIP for shortcut icons.
 - Icon generator source is kept with the repository and runs during CI.
+
+NEW IN v1.5
+- AussieTV.exe embeds its Windows Explorer/shortcut icon directly.
+- Microsoft Edge or Google Chrome opens a separate app-style window when
+  installed; otherwise the ordinary default browser is used.
+- Set AUSSIE_TV_BROWSER_MODE=default before launching for normal browser
+  tabs instead. The console/log and URL fallback remain available.
+- The app window remains browser-owned, not an independent native WebView.

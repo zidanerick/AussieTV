@@ -1,7 +1,7 @@
 # AussieTV project continuity / future-chat handoff
 
 **Last documented:** 16 November 2026  
-**Current code:** v1.4 on `main`  
+**Current code:** v1.5 on `main`  
 **Repository:** https://github.com/zidanerick/AussieTV
 
 ## User goal
@@ -24,7 +24,9 @@ Create a simple, TV-like Windows interface for Australia's main free-to-air broa
 - v1.4: original AussieTV logo and wordmark, favicons and multi-size ICO; reproducible Go icon generator and brand asset HTTP tests. The existing guide/player behaviour is unchanged.
 - Original branding source: `static/app-icon.svg`, `static/aussietv-logo.svg`, `tools/iconbuilder/main.go` and `assets/BRANDING.md`.
 - Run `go run ./tools/iconbuilder` before building to produce generated PNG and ICO files. The GitHub Actions build runs this automatically.
-- Windows ZIP contains `assets/AussieTV.ico` for shortcut customization. This does not claim the icon is embedded in the executable's PE resources.
+- Windows ZIP contains `assets/AussieTV.ico` for shortcut customization. The original v1.4 icon was supplied separately; v1.5 now also embeds it in the executable.
+
+- v1.5: embeds seven icon sizes in the PE executable via `tools/iconbuilder/winresource.go`, generated `rsrc_windows_amd64.syso`. Prefers Edge/Chrome `--app` window, retains v1.1 shell/default browser fallback and supports `AUSSIE_TV_BROWSER_MODE=default`.
 
 ## Exact historical versions
 
@@ -56,6 +58,8 @@ Bundle `AussieTV.exe`, `RUN-AussieTV.cmd`, `README.txt` and `assets/AussieTV.ico
 - User previously confirmed that the v1.1 Windows app launched successfully.
 - **Not proven**: live Australian stream playback, Windows native startup for v1.3, sustained stream reliability, artwork matching for every programme, or Australian geolocation behaviour. Browser interaction tests used mock EPG data and did not test video. Do not claim those tests passed.
 
+- v1.5 local verification: Go tests passed, Windows amd64 executable cross-built, and Windows PE .rsrc structure inspected with seven icon sizes. The native Windows app-mode/window/taskbar behaviour is not independently tested on Windows; the browser still owns that window.
+
 ## Technical risks / boundaries
 
 1. Third-party stream index is not guaranteed to stay online and does not imply rights to redistribute channels.
@@ -85,3 +89,7 @@ If a change is made, update this document with: exact commit SHA, affected files
 - PNG and ICO output include transparent imagery; the ICO was structurally inspected with Pillow for all seven icon resolutions.
 - GitHub Actions Windows build and native user-facing UI are separate validation gates. Live channel playback was not changed by this branding update.
 - Further improvement: embed the Windows icon into PE resources if wanted, and track channel-by-channel playback evidence.
+
+## v1.5 handoff
+
+Before each Windows build run `go run ./tools/iconbuilder`, which produces `rsrc_windows_amd64.syso` (ignored by Git). Then run `go test ./...` and compile for Windows amd64. Keep the existing console launcher and default browser fallback. Windows EXE icon is verified by PE structure inspection, not native Windows Explorer UI. Do not claim a separate native window, as Edge/Chrome still provides the app window.

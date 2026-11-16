@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5 (16 November 2026)
+- Embed a multi-size native Windows executable icon (16 to 256 px) with a reproducible Go-generated PE resource, without external tools or runtime dependencies.
+- Prefer app-style Edge/Chrome windows and retain the proven default-browser fallback. Add an environment switch for normal browser tabs.
+- Clean up the browser window title and guide version badge; include the ICO at ZIP root.
+- Add COFF resource structure and browser-path tests. Local Go tests, Windows cross-build and PE icon tree inspection passed; actual native Windows app window and taskbar behaviour remain unverified.
+
+
 Historical source versions are preserved as separate commits and branches. These commits were imported from the original ChatGPT-produced source archives on 15 November 2026. Their history reflects version order, not the original local file creation times.
 
 ## v1.4 (16 November 2026)

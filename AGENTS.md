@@ -16,3 +16,6 @@
 13. Do not confuse headless Chromium with real Windows/browser playback validation. Track unverified streams in issue #1.
 
 14. For branding edits, keep SVG and generated PNG/ICO visuals consistent. Run `go run ./tools/iconbuilder` before build/test and preserve working broadcaster logos.
+
+14. Run `go run ./tools/iconbuilder` before building; it generates `rsrc_windows_amd64.syso` with the embedded EXE icon. Keep generator tests and inspect the icon resource on cross-built executables.
+15. The preferred branded app window is Edge/Chrome `--app`, not a native WebView. Preserve the default browser and console fallbacks, and avoid claiming a fixed browser taskbar identity.

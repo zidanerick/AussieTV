@@ -88,5 +88,6 @@ func main(){
  }
  for _,data:=range imgs{_,_=ico.Write(data)}
  for _,path:=range []string{"assets/AussieTV.ico","static/favicon.ico"}{if err:=os.WriteFile(path,ico.Bytes(),0644);err!=nil{panic(err)}}
- fmt.Println("Generated AussieTV brand icons (PNG and ICO)")
+ if err := writeWindowsResource(filepath.Join("assets", "AussieTV.ico"), "rsrc_windows_amd64.syso"); err != nil { panic(err) }
+ fmt.Println("Generated AussieTV favicons, ICO and embedded Windows executable resources")
 }
