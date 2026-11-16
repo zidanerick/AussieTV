@@ -33,7 +33,7 @@ import (
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
-const version = "1.3"
+const version = "1.4"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -620,24 +620,50 @@ func startupFailure(err error) {
 	}
 	os.Exit(1)
 }
+
+// serveAppAsset explicitly maps local web paths to embedded application files.
+// This avoids exposing arbitrary files to the local browser interface.
+func serveAppAsset(w http.ResponseWriter, r *http.Request) {
+	var path, contentType string
+	switch r.URL.Path {
+	case "/":
+		path, contentType = "static/index.html", "text/html; charset=utf-8"
+	case "/app-icon.svg":
+		path, contentType = "static/app-icon.svg", "image/svg+xml"
+	case "/aussietv-logo.svg":
+		path, contentType = "static/aussietv-logo.svg", "image/svg+xml"
+	case "/favicon-32.png":
+		path, contentType = "static/favicon-32.png", "image/png"
+	case "/favicon-192.png":
+		path, contentType = "static/favicon-192.png", "image/png"
+	case "/favicon.ico":
+		path, contentType = "static/favicon.ico", "image/x-icon"
+	case "/site.webmanifest":
+		path, contentType = "static/site.webmanifest", "application/manifest+json"
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	body, err := assets.ReadFile(path)
+	if err != nil {
+		http.Error(w, "Application asset missing", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	if path == "static/index.html" {
+		w.Header().Set("Cache-Control", "no-store")
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+	}
+	_, _ = w.Write(body)
+}
+
 func main() {
 	prepareLogging()
 	log.Printf("AussieTV v%s starting on %s/%s", version, runtime.GOOS, runtime.GOARCH)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		b, err := assets.ReadFile("static/index.html")
-		if err != nil {
-			http.Error(w, "UI missing", 500)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-store")
-		_, _ = w.Write(b)
-	})
+	mux.HandleFunc("GET /", serveAppAsset)
 	mux.HandleFunc("GET /api/artwork", artworkHandler)
 	mux.HandleFunc("GET /api/channels", func(w http.ResponseWriter, r *http.Request) {
 		markPing()

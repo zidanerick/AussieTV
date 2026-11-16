@@ -4,7 +4,7 @@ cd /d "%~dp0"
 title AussieTV Launcher
 
 echo ========================================================
-echo  AussieTV 1.2 - Windows Launcher
+echo  AussieTV 1.4 - Windows Launcher
 echo ========================================================
 echo.
 if not exist "AussieTV.exe" (

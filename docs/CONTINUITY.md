@@ -1,7 +1,7 @@
 # AussieTV project continuity / future-chat handoff
 
-**Last documented:** 15 November 2026  
-**Current code:** v1.3 on `main`  
+**Last documented:** 16 November 2026  
+**Current code:** v1.4 on `main`  
 **Repository:** https://github.com/zidanerick/AussieTV
 
 ## User goal
@@ -21,6 +21,11 @@ Create a simple, TV-like Windows interface for Australia's main free-to-air broa
 - v1.3: startup timeout for HLS playback and one maximum HLS media recovery.
 - v1.3: signed HLS segment/variant URL rewriting, strict channel-root validation, outbound DNS/public IP and redirect guards, local Host/Origin checks.
 
+- v1.4: original AussieTV logo and wordmark, favicons and multi-size ICO; reproducible Go icon generator and brand asset HTTP tests. The existing guide/player behaviour is unchanged.
+- Original branding source: `static/app-icon.svg`, `static/aussietv-logo.svg`, `tools/iconbuilder/main.go` and `assets/BRANDING.md`.
+- Run `go run ./tools/iconbuilder` before building to produce generated PNG and ICO files. The GitHub Actions build runs this automatically.
+- Windows ZIP contains `assets/AussieTV.ico` for shortcut customization. This does not claim the icon is embedded in the executable's PE resources.
+
 ## Exact historical versions
 
 - v1.0: commit `681b9aa580f0ac5f2ff961f2804c654866631391` ; branch `versions/v1.0`
@@ -32,11 +37,12 @@ Create a simple, TV-like Windows interface for Australia's main free-to-air broa
 ## Build / test / launch
 
 ```bash
+go run ./tools/iconbuilder
 go test ./...
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o AussieTV.exe .
 ```
 
-Bundle `AussieTV.exe`, `RUN-AussieTV.cmd`, `README.txt`. GitHub Actions workflow `.github/workflows/windows-build.yml` builds and uploads this ZIP automatically. Local address defaults to http://127.0.0.1:45781.
+Bundle `AussieTV.exe`, `RUN-AussieTV.cmd`, `README.txt` and `assets/AussieTV.ico`. GitHub Actions workflow `.github/workflows/windows-build.yml` builds and uploads this ZIP automatically. Local address defaults to http://127.0.0.1:45781.
 
 ## Verification state
 
@@ -73,3 +79,9 @@ Bundle `AussieTV.exe`, `RUN-AussieTV.cmd`, `README.txt`. GitHub Actions workflow
 Say: "Continue development of https://github.com/zidanerick/AussieTV. Read README.md, AGENTS.md, docs/CONTINUITY.md and current GitHub issues. Inspect the actual main branch before changing code. Work from the current version, preserve historical branches, run tests, and update the handoff document."
 
 If a change is made, update this document with: exact commit SHA, affected files, tests executed, Windows device evidence (or an explicit gap), regressions, and the next task. Last v1.3 files: `main.go`, `main_test.go`, `static/index.html`, `README.txt`, `README.md`, `CHANGELOG.md`, `AGENTS.md` and this continuity file.
+
+## v1.4 validation and next step
+- Go icon generation, Go tests, Windows cross-compilation and local asset HTTP smoke test passed on Linux on 16 Nov 2026.
+- PNG and ICO output include transparent imagery; the ICO was structurally inspected with Pillow for all seven icon resolutions.
+- GitHub Actions Windows build and native user-facing UI are separate validation gates. Live channel playback was not changed by this branding update.
+- Further improvement: embed the Windows icon into PE resources if wanted, and track channel-by-channel playback evidence.

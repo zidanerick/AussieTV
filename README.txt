@@ -1,4 +1,4 @@
-AussieTV v1.3 - Live Australian Television for Windows
+AussieTV v1.4 - Live Australian Television for Windows
 ======================================================
 
 WHAT'S NEW IN V1.2
@@ -65,3 +65,9 @@ NEW IN v1.3
 - Stream proxy restricted to channel stream and signed resources from channel HLS manifests.
 
 The TV guide is community supplied, and actual Windows broadcaster streaming is not verified.
+
+NEW IN v1.4
+- Original AussieTV play-screen logo and favicon throughout the application.
+- Browser favicon, install icon and local site manifest.
+- Multi-size AussieTV.ico included in the Windows ZIP for shortcut icons.
+- Icon generator source is kept with the repository and runs during CI.
