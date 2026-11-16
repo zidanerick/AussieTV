@@ -1,7 +1,7 @@
 # AussieTV project continuity / future-chat handoff
 
 **Last documented:** 16 November 2026  
-**Current code:** v1.5.1 on `main`  
+**Current code:** v1.6 on `main`  
 **Repository:** https://github.com/zidanerick/AussieTV
 
 ## User goal
@@ -100,3 +100,12 @@ Before each Windows build run `go run ./tools/iconbuilder`, which produces `rsrc
 - Mapping and browser image-error recovery in `static/index.html`: ABC NEWS, SBS, SBS2, SBS World Movies, SBS Food and NITV. The original feed URL remains the first choice.
 - Tests: local Go unit tests and race detector passed; Windows x64 cross-compiled; SVG syntax and JS syntax validated. Headless browser navigation blocked by the test environment; no native Windows verification yet. No change to HLS proxy or playback.
 - Next: confirm logo fallback for each named channel on Windows, particularly when upstream artwork URLs fail.
+
+## v1.6: Captions and AussieTV Text (16 November 2026)
+
+- New caption track selector and C shortcut in `static/index.html`; HLS subtitle renditions selected through Hls.subtitleTrack and in-band CEA caption tracks through HTMLMediaElement.textTracks.
+- Caption selector is disabled when the current IPTV source lacks accessible tracks. Preference for language saved in localStorage. No subtitles are generated; playback on broadcaster's official site remains fallback.
+- New Teletext-inspired information overlay uses the EPG: 100 index, 200 now/next, 300 channels, 400 help. It is NOT decoding old Austext or DVB teletext packets. T opens/closes, Escape closes.
+- Existing stream proxy and safety checks unchanged; only front-end plus version and docs changed.
+- Local: Go tests and race detector pass; JS syntax check passes; browser UI smoke using mocked EPG and injected native caption track passes. Windows x64 cross-compilation passed. No native Windows or real broadcast caption testing yet.
+- Next: test ABC News, ABC TV, SBS and commercial network caption selector on actual Windows streams; capture a per-channel caption capability table. Determine if DVB-T support is needed for any original broadcast-only captions.

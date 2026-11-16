@@ -1,4 +1,4 @@
-AussieTV v1.5.1 - Live Australian Television for Windows
+AussieTV v1.6 - Live Australian Television for Windows
 ======================================================
 
 WHAT'S NEW IN V1.2
@@ -86,3 +86,10 @@ NEW IN v1.5.1
   SBS World Movies, SBS Food and NITV.
 - Existing broadcaster/feed logos are preferred whenever they load.
 - Playback remains unchanged.
+
+NEW IN V1.6
+- HLS subtitle and closed-caption selector (only tracks available in the live stream).
+- Press C to toggle available captions. Preferences are saved locally.
+- Press T or click TEXT for a Teletext-style local program information display.
+  This uses the existing EPG and is NOT original broadcast Teletext.
+- No artificial subtitles are generated. If none are present, CC is unavailable.

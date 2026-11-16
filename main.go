@@ -33,7 +33,7 @@ import (
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
-const version = "1.5.1"
+const version = "1.6"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -454,7 +454,7 @@ func hlsHandler(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("Accept", "*/*")
 	// The third-party index may request a client signature for legacy feeds.
 	if r.URL.Query().Get("ua") == "source" {
-		req.Header.Set("User-Agent", "otg/1.5.1 (AppleTv Apple TV 4; tvOS16.0; appletv.client)")
+		req.Header.Set("User-Agent", "otg/1.6 (AppleTv Apple TV 4; tvOS16.0; appletv.client)")
 	}
 	if h := r.Header.Get("Range"); h != "" {
 		req.Header.Set("Range", h)

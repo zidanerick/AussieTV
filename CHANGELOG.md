@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.6 (16 November 2026)
+- Add CC/subtitle track selector for streams that expose HLS WebVTT renditions or browser-native caption text tracks.
+- Provide C shortcut, caption-language preference and explicit No captions state; avoid pretending tracks exist.
+- Add Teletext-style AussieTV Text panel with 100 index, 200 now/next, 300 channels and 400 help pages using the existing EPG, not defunct Austext broadcast data.
+- Preserve playback and network proxy behaviour. Add no external caption source.
+- Local Go unit tests/race checks, JS syntax checks, Windows x64 cross-compilation, and headless Chromium UI checks passed with mocked programme data and captions. Live stream captions and native Windows window still need real-device verification.
+
+
 ## v1.5.1 (16 November 2026)
 - Add bundled SVG fallback tiles for ABC NEWS, SBS, SBS2, SBS World Movies, SBS Food and NITV.
 - When a feed-provided logo is missing or fails to load, use a local channel-specific identifier tile rather than a generic network block.
