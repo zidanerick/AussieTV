@@ -24,3 +24,6 @@
 
 15. For v1.6+ captions, never claim a live stream carries captions merely because the broadcaster captions its terrestrial broadcasts or official player. UI should only list actual tracks exposed in the current source and remain off by default. Preserve and test Hls.subtitleTrack/HTMLMediaElement.textTracks selection, and distinguish simulated browser tracks from real broadcasts.
 16. AussieTV Text 100/200/300/400 is a simulated locally-generated information overlay. Do not describe it as receiving Austext or legacy broadcast teletext packets. Preserve the original HTML/CSS interface and local fallback launch behavior.
+
+17. v1.7 remote UI lives in `static/remote.js`. Preserve D-pad/OK/Back and help modal behavior, spatial focus, native select support, quick tile/guide focus on redraw and numeric entry. Run Node remote tests and browser mock integration for UI changes.
+18. A separate Docker server mode must change localhost-only lifecycle and authentication/Host/Origin assumptions before exposure; avoid trivial 0.0.0.0 binding. Jellyfin supports M3U/XMLTV without a plugin. See docs/INTEGRATIONS.md.

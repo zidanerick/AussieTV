@@ -7,8 +7,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,7 +33,7 @@ import (
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
-const version = "1.6"
+const version = "1.7.0"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -86,59 +86,78 @@ var client = &http.Client{Timeout: 24 * time.Second, Transport: &http.Transport{
 	Proxy: http.ProxyFromEnvironment, MaxIdleConns: 50, MaxIdleConnsPerHost: 12, IdleConnTimeout: 65 * time.Second,
 	TLSHandshakeTimeout: 12 * time.Second, ResponseHeaderTimeout: 20 * time.Second,
 }}
+
 // Each install's local HLS proxy only accepts the indexed channel's root URL,
 // or URLs that the backend itself rewrote from an upstream HLS manifest.
 var streamKey [32]byte
 
 func init() {
-    if _, err := rand.Read(streamKey[:]); err != nil {
-        panic("cannot initialize the stream proxy secret: " + err.Error())
-    }
+	if _, err := rand.Read(streamKey[:]); err != nil {
+		panic("cannot initialize the stream proxy secret: " + err.Error())
+	}
 }
 
 func safeDial(ctx context.Context, network, address string) (net.Conn, error) {
-    host, port, err := net.SplitHostPort(address)
-    if err != nil { return nil, err }
-    lookupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-    defer cancel()
-    ips, err := net.DefaultResolver.LookupIPAddr(lookupCtx, host)
-    if err != nil { return nil, err }
-    // Do not permit DNS names to resolve to LAN, loopback or metadata targets.
-    var dialer net.Dialer
-    for _, target := range ips {
-        ip := target.IP
-        if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() { continue }
-        conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
-        if dialErr == nil { return conn, nil }
-        err = dialErr
-    }
-    if err == nil { err = errors.New("stream target resolves only to blocked IP addresses") }
-    return nil, err
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	ips, err := net.DefaultResolver.LookupIPAddr(lookupCtx, host)
+	if err != nil {
+		return nil, err
+	}
+	// Do not permit DNS names to resolve to LAN, loopback or metadata targets.
+	var dialer net.Dialer
+	for _, target := range ips {
+		ip := target.IP
+		if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+			continue
+		}
+		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+		if dialErr == nil {
+			return conn, nil
+		}
+		err = dialErr
+	}
+	if err == nil {
+		err = errors.New("stream target resolves only to blocked IP addresses")
+	}
+	return nil, err
 }
 
 var mediaClient = &http.Client{Timeout: 0, CheckRedirect: func(req *http.Request, via []*http.Request) error {
-    if len(via) >= 10 { return errors.New("too many stream redirects") }
-    _, err := validateRemote(req.URL.String())
-    return err
+	if len(via) >= 10 {
+		return errors.New("too many stream redirects")
+	}
+	_, err := validateRemote(req.URL.String())
+	return err
 }, Transport: &http.Transport{
-    // Avoid a system proxy bypassing the remote IP restrictions.
-    DialContext: safeDial, MaxIdleConns: 80, MaxIdleConnsPerHost: 24,
-    IdleConnTimeout: 45 * time.Second, TLSHandshakeTimeout: 12 * time.Second, ResponseHeaderTimeout: 25 * time.Second,
+	// Avoid a system proxy bypassing the remote IP restrictions.
+	DialContext: safeDial, MaxIdleConns: 80, MaxIdleConnsPerHost: 24,
+	IdleConnTimeout: 45 * time.Second, TLSHandshakeTimeout: 12 * time.Second, ResponseHeaderTimeout: 25 * time.Second,
 }}
 
 func streamSignature(channelID, remote string) string {
-    mac := hmac.New(sha256.New, streamKey[:])
-    _, _ = io.WriteString(mac, channelID+"\n"+remote)
-    return hex.EncodeToString(mac.Sum(nil))
+	mac := hmac.New(sha256.New, streamKey[:])
+	_, _ = io.WriteString(mac, channelID+"\n"+remote)
+	return hex.EncodeToString(mac.Sum(nil))
 }
 func permittedStream(ch Channel, remote, signature string) bool {
-    if ch.Stream != "" && remote == ch.Stream { return true }
-    if signature == "" { return false }
-    provided, err := hex.DecodeString(signature)
-    if err != nil { return false }
-    mac := hmac.New(sha256.New, streamKey[:])
-    _, _ = io.WriteString(mac, ch.ID+"\n"+remote)
-    return subtle.ConstantTimeCompare(mac.Sum(nil), provided) == 1
+	if ch.Stream != "" && remote == ch.Stream {
+		return true
+	}
+	if signature == "" {
+		return false
+	}
+	provided, err := hex.DecodeString(signature)
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, streamKey[:])
+	_, _ = io.WriteString(mac, ch.ID+"\n"+remote)
+	return subtle.ConstantTimeCompare(mac.Sum(nil), provided) == 1
 }
 
 type cacheEntry struct {
@@ -278,7 +297,7 @@ func loadChannels(region string) ChannelData {
 		return old.data
 	}
 	req, _ := http.NewRequest("GET", sourceBase+region+"/tv.json", nil)
-	req.Header.Set("User-Agent", "AussieTV/1.5.1 (+personal local player)")
+	req.Header.Set("User-Agent", "AussieTV/1.7.0 (+personal local player)")
 	response, err := client.Do(req)
 	if err == nil && response.StatusCode != 200 {
 		err = fmt.Errorf("EPG server HTTP %d", response.StatusCode)
@@ -536,52 +555,75 @@ func heartbeatWatch() {
 		}
 	}
 }
-// Browser candidates are deliberately limited to installed Edge and Chrome.
+
+// windowsBrowserCandidates prioritises Edge, then Chrome, without assuming that
+// either browser is installed. App-mode windows expose the site's title and
+// favicon and avoid the address bar; these are still browser-owned windows.
 func windowsBrowserCandidates() []string {
- paths:=[]string{}
- seen:=map[string]bool{}
- for _,env:=range []string{"ProgramFiles(x86)","ProgramFiles","LOCALAPPDATA"} {
-  if base:=os.Getenv(env);base!="" {
-   for _,p:=range []string{
-    filepath.Join(base,"Microsoft","Edge","Application","msedge.exe"),
-    filepath.Join(base,"Google","Chrome","Application","chrome.exe"),
-   } {
-    key:=strings.ToLower(p)
-    if !seen[key] {seen[key]=true;paths=append(paths,p)}
-   }
-  }
- }
- return paths
+	paths := make([]string, 0, 8)
+	seen := map[string]bool{}
+	for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"} {
+		if base := os.Getenv(env); base != "" {
+			for _, candidate := range []string{
+				filepath.Join(base, "Microsoft", "Edge", "Application", "msedge.exe"),
+				filepath.Join(base, "Google", "Chrome", "Application", "chrome.exe"),
+			} {
+				key := strings.ToLower(candidate)
+				if !seen[key] {
+					paths = append(paths, candidate)
+					seen[key] = true
+				}
+			}
+		}
+	}
+	return paths
 }
 func openBrowser(addr string) error {
- if os.Getenv("AUSSIE_TV_NO_BROWSER")=="1" {log.Print("Automatic browser launch disabled for testing");return nil}
- if runtime.GOOS=="windows" {
-  var failures []string
-  // App-mode has a separate window without a browser address bar. Users can
-  // select AUSSIE_TV_BROWSER_MODE=default to use normal browser tabs.
-  if !strings.EqualFold(os.Getenv("AUSSIE_TV_BROWSER_MODE"),"default") {
-   for _,path:=range windowsBrowserCandidates() {
-    if stat,err:=os.Stat(path);err!=nil||stat.IsDir(){continue}
-    if err:=exec.Command(path,"--app="+addr,"--window-size=1360,900").Start();err==nil{
-     log.Printf("Launched dedicated browser app window: %s",path);return nil
-    } else {failures=append(failures,filepath.Base(path)+": "+err.Error())}
-   }
-  }
-  // Keep the v1.1 system-default and Windows-shell fallbacks.
-  if err:=exec.Command("cmd.exe","/c","start","",addr).Start();err==nil{
-   log.Printf("Requested Windows default browser: %s",addr);return nil
-  } else {failures=append(failures,"cmd/start: "+err.Error())}
-  if err:=exec.Command("rundll32.exe","url.dll,FileProtocolHandler",addr).Start();err==nil{
-   log.Printf("Requested URL using Windows shell: %s",addr);return nil
-  } else {failures=append(failures,"rundll32: "+err.Error())}
-  return fmt.Errorf("no browser could be launched: %s",strings.Join(failures,"; "))
- }
- for _,name:=range []string{"xdg-open","open"} {
-  if p,err:=exec.LookPath(name);err==nil {
-   if err:=exec.Command(p,addr).Start();err==nil{return nil}
-  }
- }
- return fmt.Errorf("no browser opener found; manually visit %s",addr)
+	if os.Getenv("AUSSIE_TV_NO_BROWSER") == "1" {
+		log.Print("Automatic browser launch disabled for testing")
+		return nil
+	}
+	if runtime.GOOS == "windows" {
+		var failures []string
+		// Prefer a dedicated app-style window on a supported installed browser.
+		// Users can set AUSSIE_TV_BROWSER_MODE=default to retain their default
+		// browser's normal tabs and address bar if preferred.
+		if !strings.EqualFold(os.Getenv("AUSSIE_TV_BROWSER_MODE"), "default") {
+			for _, path := range windowsBrowserCandidates() {
+				if stat, err := os.Stat(path); err != nil || stat.IsDir() {
+					continue
+				}
+				if err := exec.Command(path, "--app="+addr, "--window-size=1360,900").Start(); err == nil {
+					log.Printf("Launched dedicated browser app window: %s", path)
+					return nil
+				} else {
+					failures = append(failures, filepath.Base(path)+": "+err.Error())
+				}
+			}
+		}
+		// Never lose the v1.1 fallback: use the system's URL association.
+		if err := exec.Command("cmd.exe", "/c", "start", "", addr).Start(); err == nil {
+			log.Printf("Requested Windows default browser: %s", addr)
+			return nil
+		} else {
+			failures = append(failures, "cmd/start: "+err.Error())
+		}
+		if err := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", addr).Start(); err == nil {
+			log.Printf("Requested URL using Windows shell: %s", addr)
+			return nil
+		} else {
+			failures = append(failures, "rundll32: "+err.Error())
+		}
+		return fmt.Errorf("no browser could be launched: %s", strings.Join(failures, "; "))
+	}
+	for _, name := range []string{"xdg-open", "open"} {
+		if p, err := exec.LookPath(name); err == nil {
+			if err := exec.Command(p, addr).Start(); err == nil {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("no browser opener found; manually visit %s", addr)
 }
 
 func prepareLogging() {
@@ -613,28 +655,30 @@ func startupFailure(err error) {
 	os.Exit(1)
 }
 
-// serveAppAsset explicitly maps local web paths to embedded application files.
-// This avoids exposing arbitrary files to the local browser interface.
+// serveAppAsset has an allow-list: the local service must not expose arbitrary
+// paths from the embedded filesystem or disk. The browser icon works offline.
 func serveAppAsset(w http.ResponseWriter, r *http.Request) {
-	var path, contentType string
+	var path, mime string
 	switch r.URL.Path {
 	case "/":
-		path, contentType = "static/index.html", "text/html; charset=utf-8"
+		path, mime = "static/index.html", "text/html; charset=utf-8"
 	case "/app-icon.svg":
-		path, contentType = "static/app-icon.svg", "image/svg+xml"
+		path, mime = "static/app-icon.svg", "image/svg+xml"
 	case "/aussietv-logo.svg":
-		path, contentType = "static/aussietv-logo.svg", "image/svg+xml"
+		path, mime = "static/aussietv-logo.svg", "image/svg+xml"
 	case "/favicon-32.png":
-		path, contentType = "static/favicon-32.png", "image/png"
+		path, mime = "static/favicon-32.png", "image/png"
 	case "/favicon-192.png":
-		path, contentType = "static/favicon-192.png", "image/png"
+		path, mime = "static/favicon-192.png", "image/png"
 	case "/favicon.ico":
-		path, contentType = "static/favicon.ico", "image/x-icon"
+		path, mime = "static/favicon.ico", "image/x-icon"
 	case "/site.webmanifest":
-		path, contentType = "static/site.webmanifest", "application/manifest+json"
+		path, mime = "static/site.webmanifest", "application/manifest+json"
+	case "/remote.js":
+		path, mime = "static/remote.js", "application/javascript"
 	case "/channel-logo-abc-news.svg", "/channel-logo-sbs.svg", "/channel-logo-sbs2.svg",
 		"/channel-logo-sbs-world-movies.svg", "/channel-logo-sbs-food.svg", "/channel-logo-nitv.svg":
-		path, contentType = "static"+r.URL.Path, "image/svg+xml"
+		path, mime = "static"+r.URL.Path, "image/svg+xml"
 	default:
 		http.NotFound(w, r)
 		return
@@ -644,7 +688,7 @@ func serveAppAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Application asset missing", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Type", mime)
 	if path == "static/index.html" {
 		w.Header().Set("Cache-Control", "no-store")
 	} else {
@@ -660,6 +704,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", serveAppAsset)
 	mux.HandleFunc("GET /api/artwork", artworkHandler)
+	mux.HandleFunc("GET /api/logo", logoHandler)
 	mux.HandleFunc("GET /api/channels", func(w http.ResponseWriter, r *http.Request) {
 		markPing()
 		jsonResponse(w, loadChannels(r.URL.Query().Get("region")))
@@ -702,7 +747,9 @@ func main() {
 		// The application is bound to loopback. Reject other Host headers to
 		// prevent DNS-rebinding access from unrelated web origins.
 		host := r.Host
-		if h, _, err := net.SplitHostPort(host); err == nil { host = h }
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
 		if host != "127.0.0.1" && host != "localhost" {
 			http.Error(w, "Invalid local host", http.StatusForbidden)
 			return

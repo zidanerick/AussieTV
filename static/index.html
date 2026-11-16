@@ -29,6 +29,13 @@
 .channel-logo .logo-image{padding:3px}
 .now-ident .logo-image{padding:6px}
 .network-logo .logo-image{padding:4px}
+/* Per-channel backgrounds are chosen after raster artwork loads. */
+.channel-logo.logo-surface-dark,.network-logo.logo-surface-dark,.now-ident.logo-surface-dark,.placeholder-logo.logo-surface-dark{background:#132139}
+.channel-logo.logo-surface-light,.network-logo.logo-surface-light,.now-ident.logo-surface-light,.placeholder-logo.logo-surface-light{background:#f1f5fb}
+.channel-logo.logo-surface-neutral,.network-logo.logo-surface-neutral,.now-ident.logo-surface-neutral,.placeholder-logo.logo-surface-neutral{background:#7e8a9b}
+.channel-logo .logo-image,.network-logo .logo-image,.now-ident .logo-image{background:transparent}
+.placeholder-logo{background:#7e8a9b}
+
 .logo-fallback{width:100%;height:100%;display:grid;place-items:center;color:white;font-size:13px;font-weight:900}
 .channel-cell{gap:10px}
 .channel-code{min-width:26px}
@@ -86,6 +93,25 @@
 
 /* v1.6: caption selection and Teletext-inspired local information pages. */
 .player-bottom{z-index:32}.player-bottom select{max-width:125px;border:1px solid #536c90;background:#101a30;color:white;padding:7px;border-radius:7px;font-size:12px}.player-bottom select:disabled{color:#98a6ba}.cc-label{align-self:center;padding:0 4px;font-weight:800;font-size:11px;color:#e7f7fc}video::cue{background-color:rgba(0,0,0,.83);color:#fff;text-shadow:0 1px 2px #000;font-family:Arial,sans-serif}.teletext-panel{position:absolute;inset:0;z-index:31;background:#081128ef;color:#e8ebff;padding:22px 24px 65px;overflow:auto;font-family:Consolas,'Lucida Console',monospace}.teletext-panel[hidden]{display:none}.teletext-panel header{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #ffdb44;padding-bottom:10px}.teletext-panel header strong{font-size:19px;color:#ffdb44}.teletext-panel header span{font-size:10px;color:#9cf0ee;align-self:center}.teletext-panel nav{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.teletext-panel nav button{background:#162a54;border:1px solid #39548a;color:#f5f9ff;padding:6px 8px;border-radius:3px;font-size:11px}.teletext-panel nav button.active{background:#e7cb46;color:#10172c}.teletext-panel nav #textClose{margin-left:auto;background:#4b2038}.teletext-panel pre{margin:0;color:#b9f5ff;font-size:clamp(11px,1.15vw,15px);line-height:1.48;white-space:pre-wrap;overflow-wrap:anywhere}.teletext-panel pre::first-line{color:#ffda67;font-weight:bold}@media(max-width:700px){.teletext-panel{padding:12px 12px 70px}.teletext-panel header span{display:none}.teletext-panel nav{gap:3px}.teletext-panel nav button{font-size:10px;padding:4px 6px}.player-bottom{padding:10px 6px}.player-bottom button{font-size:11px;padding:5px}.player-bottom select{max-width:90px;padding:5px;font-size:10px}}
+
+/* Focus must remain visible with a keyboard, USB/HDMI remote, or TV browser. */
+.remote-navigation button:focus,.remote-navigation a:focus,.remote-navigation select:focus,
+.remote-navigation [tabindex]:focus,.remote-navigation button.remote-focused{outline:3px solid #ffdb5c!important;outline-offset:3px!important;box-shadow:0 0 0 5px #041424b8,0 0 14px #ffe77c99!important;position:relative;z-index:40}
+button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #ffdb5c;outline-offset:3px}
+.remote-navigation .player-bottom{opacity:1;pointer-events:auto;transition:none}
+.remote-navigation .player-bottom button,.remote-navigation .player-bottom select{min-height:38px}
+.remote-navigation .quick-card,.remote-navigation .side-item,.remote-navigation .channel-cell{min-height:48px}
+.remote-hud{position:fixed;right:18px;bottom:18px;z-index:85;max-width:min(420px,80vw);background:#09192ef5;color:#f7f9ff;border:2px solid #ffdb5c;border-radius:12px;box-shadow:0 10px 24px #000a;padding:12px 18px;font-size:18px;font-weight:800;pointer-events:none}
+.remote-hud[hidden]{display:none}
+.remote-help[hidden]{display:none}
+.remote-help{position:fixed;inset:0;background:#040914ed;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.remote-help-box{max-height:90vh;overflow-y:auto;width:min(720px,100%);background:#14243d;border:2px solid #63d3ef;border-radius:16px;padding:25px;box-shadow:0 18px 45px #000d}
+.remote-help h2{font-size:24px;margin:0 0 12px}.remote-help p{line-height:1.55;color:#cad8ea}
+.remote-help-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0 20px}
+.remote-help-grid div{background:#0d1a30;padding:12px;border-radius:8px;line-height:1.45}
+.remote-help-grid b{color:#ffdb5c}
+.remote-help-close{min-height:48px;font-size:16px}
+@media(max-width:640px){.remote-help-grid{grid-template-columns:1fr}.remote-help-box{padding:15px}.remote-hud{left:18px;right:auto;font-size:14px}}
 </style>
 </head>
 <body>
@@ -98,19 +124,35 @@
 </aside>
 <main class="main">
  <div class="topbar">
-  <div><div class="eyebrow">AUSTRALIAN LIVE TELEVISION</div><h1>Watch &amp; Guide <span class="tiny-badge">V1.6</span></h1></div>
-  <div class="top-actions"><span class="clock" id="clock">--:--<small>LOCAL TIME</small></span><select id="region" title="Choose local channel area"><option>Melbourne</option><option>Sydney</option><option>Brisbane</option><option>Adelaide</option><option>Perth</option><option>Hobart</option><option>Canberra</option><option>Darwin</option></select><button class="btn" id="refresh" title="Refresh channels and guide">↻ Refresh</button><button class="btn ghost" id="quit" title="Close AussieTV">✕ Exit</button></div>
+  <div><div class="eyebrow">AUSTRALIAN LIVE TELEVISION</div><h1>Watch &amp; Guide <span class="tiny-badge">V1.7</span></h1></div>
+  <div class="top-actions"><span class="clock" id="clock">--:--<small>LOCAL TIME</small></span><select id="region" title="Choose local channel area"><option>Melbourne</option><option>Sydney</option><option>Brisbane</option><option>Adelaide</option><option>Perth</option><option>Hobart</option><option>Canberra</option><option>Darwin</option></select><button class="btn" id="remoteHelp" aria-haspopup="dialog" aria-controls="remoteHelpPanel" title="Remote and keyboard controls">⌨ Remote help</button><button class="btn" id="refresh" title="Refresh channels and guide">↻ Refresh</button><button class="btn ghost" id="quit" title="Close AussieTV">✕ Exit</button></div>
  </div>
  <section class="hero">
-  <div class="player" id="player"><video id="video" controls playsinline></video><div class="placeholder" id="placeholder"><div class="placeholder-art" id="placeholderArt"></div><div class="placeholder-shade"></div><img class="placeholder-logo" id="placeholderLogo" alt="" hidden><span class="antenna" id="placeholderAntenna"><img src="/app-icon.svg" alt=""></span><strong id="statusTitle">Preparing live TV</strong><p id="statusText">Loading Australian channels and program listings.</p><button id="retry" class="btn primary" style="display:none">Retry live stream</button></div><div class="status-pill"><span class="pulse"></span> LIVE <span id="playerChannel">TV</span></div><div class="player-bottom"><div><button id="prev" title="Previous channel">‹ Prev</button><button id="next" title="Next channel">Next ›</button></div><div><label class="cc-label" for="captionTrack">CC</label><select id="captionTrack" aria-label="Closed captions or subtitles" title="Subtitles (C)" disabled><option value="off">Unavailable</option></select><button id="textToggle" title="AussieTV Text information (T)" aria-controls="textPanel" aria-expanded="false">TEXT</button><button id="playlist" title="Download this channel playlist for VLC">M3U</button><button id="fullscreen" title="Fullscreen (F)">⛶ Fullscreen</button></div></div><section class="teletext-panel" id="textPanel" aria-label="AussieTV Text information pages" hidden><header><strong>AussieTV TEXT</strong><span>LOCAL GUIDE · NOT BROADCAST TELETEXT</span></header><nav aria-label="Text pages"><button data-textpage="100">100 Home</button><button data-textpage="200">200 On now</button><button data-textpage="300">300 Channels</button><button data-textpage="400">400 Help</button><button id="textClose" aria-label="Close Text">✕</button></nav><pre id="textContent" aria-live="polite"></pre></section></div>
+  <div class="player" id="player"><video id="video" controls playsinline></video><div class="placeholder" id="placeholder"><div class="placeholder-art" id="placeholderArt"></div><div class="placeholder-shade"></div><img class="placeholder-logo" id="placeholderLogo" alt="" hidden><span class="antenna" id="placeholderAntenna"><img src="/app-icon.svg" alt=""></span><strong id="statusTitle">Preparing live TV</strong><p id="statusText">Loading Australian channels and program listings.</p><button id="retry" class="btn primary" style="display:none">Retry live stream</button></div><div class="status-pill"><span class="pulse"></span> LIVE <span id="playerChannel">TV</span></div><div class="player-bottom"><div><button id="playPause" title="Play or pause (Media key / Space)" aria-label="Play or pause">▶ Play</button><button id="mute" aria-pressed="false" title="Mute or unmute audio" aria-label="Mute or unmute">◖ Sound</button><button id="prev" title="Previous channel">‹ Prev</button><button id="next" title="Next channel">Next ›</button></div><div><label class="cc-label" for="captionTrack">CC</label><select id="captionTrack" aria-label="Closed captions or subtitles" title="Subtitles (C)" disabled><option value="off">Unavailable</option></select><button id="textToggle" title="AussieTV Text information (T)" aria-controls="textPanel" aria-expanded="false">TEXT</button><button id="playlist" title="Download this channel playlist for VLC">M3U</button><button id="fullscreen" title="Fullscreen (F)">⛶ Fullscreen</button></div></div><section class="teletext-panel" id="textPanel" aria-label="AussieTV Text information pages" hidden><header><strong>AussieTV TEXT</strong><span>LOCAL GUIDE · NOT BROADCAST TELETEXT</span></header><nav aria-label="Text pages"><button data-textpage="100">100 Home</button><button data-textpage="200">200 On now</button><button data-textpage="300">300 Channels</button><button data-textpage="400">400 Help</button><button id="textClose" aria-label="Close Text">✕</button></nav><pre id="textContent" aria-live="polite"></pre></section></div>
   <div class="now-panel"><div class="now-header"><div class="now-label">● ON AIR NOW</div><button class="btn fav-toggle" id="favourite" aria-pressed="false" title="Save or remove this channel from favourites">☆ Favourite</button></div><div class="now-channel"><span class="now-ident" id="nowIdent">TV</span><div><div class="now-name" id="nowName">Select a channel</div><div class="subtext" id="nowNetwork">Free-to-air television</div></div></div><div class="program-intro" id="programIntro"><div><div class="now-title" id="nowTitle">Choose a channel from the guide</div><div class="program-time" id="nowTime">Guide loading</div></div><div class="poster-frame" id="posterFrame"><img id="nowPoster" alt="Current programme artwork"></div></div><div class="art-credit" id="artCredit">Programme image: <a id="artSource" href="https://www.tvmaze.com/" target="_blank" rel="noreferrer">TVmaze</a></div><div class="progress"><div id="progressBar"></div></div><div class="next-block"><small>UP NEXT</small><div class="next-title" id="nextTitle">Awaiting program information</div><div class="subtext" id="nextTime">&nbsp;</div></div><div class="now-actions"><button class="btn primary" id="watch">▶ Watch live</button><a class="btn" id="official" href="https://iview.abc.net.au/collection/959" target="_blank" rel="noreferrer">↗ Official player</a></div></div>
  </section>
  <section class="quick-channels" id="quickChannels" aria-label="Quick channel selection"></section>
  <div class="notice" id="notice"></div>
  <div class="section-head"><div><div class="section-title">Program guide</div><div class="section-sub" id="guideSubtitle">Now and coming up • Times shown in your computer's time zone</div></div><div class="guide-actions"><button class="btn" id="earlier" aria-label="Earlier programs">‹</button><button class="btn" id="goNow">Now</button><button class="btn" id="later" aria-label="Later programs">›</button></div></div>
  <section class="guide-wrap" aria-label="Television program guide"><div class="guide-head"><div class="guide-label">Channel</div><div class="hours" id="hours"></div></div><div class="guide-body" id="guide"></div></section>
- <div class="footer"><span>Schedule and stream links: <a href="https://i.mjh.nz/au/" target="_blank" rel="noreferrer">mjh.nz</a>. Streams may change or be geo-restricted. Official playback remains available for each network. When available, show artwork is provided by <a href="https://www.tvmaze.com/" target="_blank" rel="noreferrer">TVmaze</a>.</span><span>Keys: ↑ ↓ channel · EPG arrows · Enter select · C captions · T Text · F fullscreen</span></div>
+ <div class="footer"><span>Schedule and stream links: <a href="https://i.mjh.nz/au/" target="_blank" rel="noreferrer">mjh.nz</a>. Streams may change or be geo-restricted. Official playback remains available for each network. When available, show artwork is provided by <a href="https://www.tvmaze.com/" target="_blank" rel="noreferrer">TVmaze</a>.</span><span>Remote: D-pad navigate · OK select · Back return · CH± switch · H help</span></div>
 </main></div>
+<section id="remoteHelpPanel" class="remote-help" role="dialog" aria-modal="true" aria-labelledby="remoteHelpHeading" hidden>
+ <div class="remote-help-box"><h2 id="remoteHelpHeading">TV remote controls</h2>
+ <p>Use a remote that sends keyboard commands through HDMI-CEC, USB, Bluetooth, a TV browser or a compatible remote-control bridge. Navigate the complete interface without a mouse.</p>
+ <div class="remote-help-grid">
+  <div><b>Arrows / D-pad</b><div>Move between channels, programmes and controls</div></div>
+  <div><b>OK / Enter</b><div>Select or open the focused item</div></div>
+  <div><b>Back / Escape</b><div>Close an overlay, exit fullscreen, return to the guide</div></div>
+  <div><b>CH +/- / Page Up/Down</b><div>Switch to the previous or next channel</div></div>
+  <div><b>Numbers 0–9</b><div>Enter a channel number, then wait a moment to tune</div></div>
+  <div><b>G / M / H</b><div>Go to guide / browse networks / show help</div></div>
+  <div><b>C / T / F</b><div>Captions / text information / fullscreen</div></div>
+  <div><b>Media play/pause</b><div>Toggle playback when supported by the browser</div></div>
+ </div><p>Some smart-TV browsers reserve the Home, Back, number or coloured remote keys. Only keys delivered to the page can be handled. Browser support for live HLS video also varies.</p>
+ <button id="remoteHelpClose" class="btn primary remote-help-close">Close help (Back)</button></div>
+</section>
+<div id="remoteHud" class="remote-hud" role="status" aria-live="polite" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.7.4/dist/hls.min.js" integrity="" crossorigin="anonymous"></script>
 <script>
 'use strict';
@@ -137,11 +179,21 @@ function localChannelLogo(ch){
  const name=String(ch?.name||'').trim().toLowerCase().replace(/\s+/g,' ');
  if(ch?.network==='ABC' && ['abc news','abc news 24','abc news channel'].includes(name))return '/channel-logo-abc-news.svg';
  if(ch?.network!=='SBS')return '';
- const paths={'sbs':'sbs','sbs2':'sbs2','sbs viceland':'sbs2','sbs world movies':'sbs-world-movies','sbs food':'sbs-food','nitv':'nitv'};
+ // SBS2 replaced SBS VICELAND on 21 August 2026. Do not claim the
+ // former VICELAND mark is the SBS2 logo.
+ const paths={'sbs':'sbs','sbs2':'sbs2','sbs world movies':'sbs-world-movies','sbs food':'sbs-food','nitv':'nitv'};
  return paths[name]?'/channel-logo-'+paths[name]+'.svg':'';
+}
+function preferredLogoProxy(ch){
+ if(!ch?.id||!validImageURL(ch.logo))return '';
+ return '/api/logo?region='+encodeURIComponent(selectedRegion)+'&ch='+encodeURIComponent(ch.id);
 }
 function channelLogoSources(ch){
  const urls=[];
+ // All curated services first use the same-origin, bounded image endpoint.
+ // Direct provider artwork is a second chance if the endpoint is unavailable.
+ const proxy=preferredLogoProxy(ch);
+ if(proxy)urls.push(proxy);
  if(ch&&validImageURL(ch.logo))urls.push(ch.logo);
  const local=localChannelLogo(ch);
  if(local)urls.push(local);
@@ -153,22 +205,62 @@ function loadChannelLogo(img,ch,loaded,failed){
  img.onerror=()=>{if(nextIndex<sources.length)img.src=sources[nextIndex++];else failed()};
  if(sources.length)img.src=sources[nextIndex++];else failed();
 }
-function logoTile(ch,cl,short){
- const wrap=document.createElement('span');wrap.className=cl;
- const back=document.createElement('span');back.className='logo-fallback';back.textContent=short;
- back.style.background=colors[ch?.network]||'#336bb0';wrap.append(back);
- if(channelLogoSources(ch).length){
-  const img=document.createElement('img');img.className='logo-image';img.alt='';img.loading='lazy';img.decoding='async';wrap.append(img);
-  loadChannelLogo(img,ch,()=>{back.style.display='none'},()=>{img.remove();back.style.display='grid'});
- }
- return wrap;
+const logoSurfaceClasses=['logo-surface-dark','logo-surface-light','logo-surface-neutral'];
+function imageTone(img){
+ // When the same-origin proxy succeeds, transparent white or black marks can
+ // be distinguished without a per-network palette or special-case mapping.
+ try{
+  const canvas=document.createElement('canvas');canvas.width=48;canvas.height=48;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  if(!ctx)return 'neutral';
+  ctx.drawImage(img,0,0,48,48);
+  const pixels=ctx.getImageData(0,0,48,48).data;
+  let count=0,luma=0,alpha=0;
+  for(let i=0;i<pixels.length;i+=4){
+   const a=pixels[i+3];if(a<48)continue;
+   count++;alpha+=a;
+   luma+=(.2126*pixels[i]+.7152*pixels[i+1]+.0722*pixels[i+2])*a;
+  }
+  if(!count)return 'neutral';
+  // Opaque artwork already has its own background; avoid forcing a contrast
+  // treatment that might hide its text.
+  if(alpha/(count*255)>.97&&count>48*48*.8)return 'neutral';
+  const brightness=luma/alpha;
+  return brightness>157?'dark':brightness<112?'light':'neutral';
+ }catch{return 'neutral'} // Cross-origin direct-image fallback: no canvas access.
 }
-function setChannelLogo(element,ch,short){const tile=logoTile(ch,'now-ident',short);element.replaceChildren(...Array.from(tile.childNodes));element.style.background='transparent'}
+function applyLogoSurface(element,img){
+ if(!element)return;
+ element.classList.remove(...logoSurfaceClasses);
+ element.classList.add('logo-surface-'+imageTone(img));
+}
+function populateLogo(element,ch,short){
+ element.classList.remove(...logoSurfaceClasses);
+ element.replaceChildren();
+ const back=document.createElement('span');back.className='logo-fallback';back.textContent=short;
+ back.style.background=colors[ch?.network]||'#336bb0';element.append(back);
+ if(!channelLogoSources(ch).length)return;
+ const img=document.createElement('img');img.className='logo-image';img.alt='';img.loading='lazy';img.decoding='async';element.append(img);
+ loadChannelLogo(img,ch,()=>{
+  if(!element.contains(img))return;
+  back.style.display='none';applyLogoSurface(element,img);
+ },()=>{
+  if(!element.contains(img))return;
+  img.remove();back.style.display='grid';
+ });
+}
+function logoTile(ch,cl,short){
+ const wrap=document.createElement('span');wrap.className=cl;populateLogo(wrap,ch,short);return wrap;
+}
+function setChannelLogo(element,ch,short){populateLogo(element,ch,short)}
 function setPlaceholderLogo(ch){
  const img=$('placeholderLogo'),ant=$('placeholderAntenna');
+ img.classList.remove(...logoSurfaceClasses);
  img.style.display='none';ant.style.display='block';img.hidden=true;
  if(!channelLogoSources(ch).length){img.removeAttribute('src');return}
- loadChannelLogo(img,ch,()=>{img.hidden=false;img.style.display='block';ant.style.display='none'},()=>{img.hidden=true;img.style.display='none';ant.style.display='block'});
+ loadChannelLogo(img,ch,()=>{
+  img.hidden=false;img.style.display='block';ant.style.display='none';applyLogoSurface(img,img);
+ },()=>{img.hidden=true;img.style.display='none';ant.style.display='block'});
 }
 function cleanArtworkTitle(raw){return String(raw||'').trim().replace(/\s+(?:s\d{1,3}\s*(?:ep\.?|e)\s*\d+.*|season\s+\d+.*|series\s+\d+.*)$/i,'').replace(/\s+\(\d{4}\)$/,'').trim()}
 function artKey(title){return cleanArtworkTitle(title).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
@@ -242,7 +334,7 @@ function renderTextPanel(){
 function toggleText(force){const panel=$('textPanel');const on=typeof force==='boolean'?force:panel.hidden;panel.hidden=!on;$('textToggle').setAttribute('aria-expanded',String(on));if(on)renderTextPanel()}
 
 function stopPlayback(){resetCaptions();currentSequence++;if(playbackTimer){clearTimeout(playbackTimer);playbackTimer=null}mediaRecoveries=0;if(hls){try{hls.destroy()}catch{ }hls=null}const v=$('video');v.pause();v.removeAttribute('src');v.load();isPlaybackStarted=false;}
-function buildQuickChannels(){const wrap=$('quickChannels');wrap.replaceChildren();for(const network of ['ABC','SBS','Seven','Nine','Ten']){const ch=all.find(c=>c.network===network&&(c.name==='ABC TV'||c.name==='SBS'||c.name==='Seven'||c.name==='Channel 9'||c.name==='10'))||all.find(c=>c.network===network);if(!ch)continue;const btn=document.createElement('button');btn.className='quick-card'+(ch.id===selected?.id?' selected':'');btn.dataset.ch=ch.id;const short=network==='ABC'?'ABC':network==='SBS'?'SBS':network==='Seven'?'7':network==='Nine'?'9':'10';btn.append(logoTile(ch,'channel-logo',short));const info=document.createElement('span');info.className='quick-copy';const nm=document.createElement('b');nm.textContent=ch.name;const ep=document.createElement('small');ep.textContent=currentProgram(ch)?.title||'Watch live TV';info.append(nm,ep);btn.append(info);btn.onclick=()=>selectChannel(ch,true);wrap.append(btn)}}
+function buildQuickChannels(){const wrap=$('quickChannels');const focusCh=document.activeElement?.closest?.('.quick-card')?.dataset.ch;wrap.replaceChildren();for(const network of ['ABC','SBS','Seven','Nine','Ten']){const ch=all.find(c=>c.network===network&&(c.name==='ABC TV'||c.name==='SBS'||c.name==='Seven'||c.name==='Channel 9'||c.name==='10'))||all.find(c=>c.network===network);if(!ch)continue;const btn=document.createElement('button');btn.className='quick-card'+(ch.id===selected?.id?' selected':'');btn.dataset.ch=ch.id;const short=network==='ABC'?'ABC':network==='SBS'?'SBS':network==='Seven'?'7':network==='Nine'?'9':'10';btn.append(logoTile(ch,'channel-logo',short));const info=document.createElement('span');info.className='quick-copy';const nm=document.createElement('b');nm.textContent=ch.name;const ep=document.createElement('small');ep.textContent=currentProgram(ch)?.title||'Watch live TV';info.append(nm,ep);btn.append(info);btn.onclick=()=>selectChannel(ch,true);wrap.append(btn)}if(focusCh)wrap.querySelector('[data-ch="'+focusCh+'"]')?.focus({preventScroll:true})}
 function syncQuickChannels(){for(const btn of document.querySelectorAll('.quick-card')){btn.classList.toggle('selected',btn.dataset.ch===selected?.id)}}
 function buildFilters(){const wrap=$('filters');const focusedFilter=document.activeElement?.closest?.('.side-item');const focusKey=focusedFilter?.dataset.filter;wrap.replaceChildren();for(const [key,text,bg] of networks){const b=document.createElement('button');b.className='side-item'+(filter===key?' active':'');b.dataset.filter=key;if(key==='All'||key==='Favourites'){const tile=document.createElement('span');tile.className='net-dot';tile.style.background=bg;tile.textContent=key==='Favourites'?'★':'ALL';b.append(tile)}else{b.append(logoTile(all.find(c=>c.network===key&&validImageURL(c.logo))||{network:key},'network-logo',text))}const name=document.createElement('span');name.textContent=key==='All'?'All channels':key;const count=document.createElement('em');count.textContent=key==='All'?all.length:key==='Favourites'?all.filter(isFavourite).length:all.filter(c=>c.network===key).length;b.append(name,count);b.onclick=()=>{filter=key;buildFilters();buildGuide();if(!visible.find(x=>x.id===selected?.id)&&visible.length)selectChannel(visible[0],false)};wrap.append(b)}if(focusKey)wrap.querySelector('[data-filter="'+focusKey+'"]')?.focus({preventScroll:true})}
 function nowDetails(){if(!selected)return;const now=currentProgram(selected),next=nextProgram(selected);const label=selected.network==='ABC'?'ABC':selected.network==='SBS'?'SBS':selected.number;const logoKey=selected.id+':'+selected.logo;
@@ -303,23 +395,7 @@ function moveGuideFocus(active,key){
  choices.sort((a,b)=>Math.abs((Number(a.dataset.start)+Number(a.dataset.end))/2-centre)-Math.abs((Number(b.dataset.start)+Number(b.dataset.end))/2-centre));
  (choices[0]||other.querySelector('.channel-cell'))?.focus();
 }
-document.addEventListener('keydown',e=>{
- if(e.ctrlKey||e.altKey||e.metaKey||e.repeat)return;
- const target=e.target;
- if(target.matches?.('input, textarea, select, [contenteditable="true"]'))return;
- if(target.matches?.('#guide .show-cell,#guide .channel-cell')&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
-  e.preventDefault();moveGuideFocus(target,e.key);return;
- }
- if(e.key==='Escape'&&!$('textPanel').hidden){e.preventDefault();toggleText(false);return}
- if(e.key.toLowerCase()==='c'&&!target.closest?.('button,a,select,video,[role="button"]')){e.preventDefault();toggleCaptions();return}
- if(e.key.toLowerCase()==='t'&&!target.closest?.('button,a,select,video,[role="button"]')){e.preventDefault();toggleText();return}
- if(e.key.toLowerCase()==='f'&&!target.matches?.('input,textarea')){e.preventDefault();$('fullscreen').click();return}
- // Respect native Enter/Space, arrows and focus on interactive controls.
- if(target.closest?.('button,a,select,video,[role="button"]'))return;
- if(e.key==='ArrowUp'){e.preventDefault();navigate(-1)}
- else if(e.key==='ArrowDown'){e.preventDefault();navigate(1)}
- else if(e.key==='Enter'){e.preventDefault();playChannel()}
-});
+// Remote/keyboard input handling is centralised in remote.js.
 let lastGuideMinute=Math.floor(Date.now()/60000);
 function clockTick(){const now=Date.now();$('clock').innerHTML=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+'<small>'+new Date().toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}).toUpperCase()+'</small>';nowDetails();const minute=Math.floor(now/60000);if(minute!==lastGuideMinute){lastGuideMinute=minute;buildGuide();buildQuickChannels()}}
 setInterval(clockTick,1000);setInterval(()=>{fetch('/api/heartbeat',{method:'POST',keepalive:true}).catch(()=>{})},10000);setInterval(()=>{if(!document.hidden)reloadSilent()},20*60000);
@@ -327,4 +403,5 @@ async function reloadSilent(){if(!data)return;try{let res=await fetch('/api/chan
 try{let last=localStorage.getItem('aussietv-region');if(last&&Array.from($('region').options).some(o=>o.value===last))$('region').value=last}catch{}
 clockTick();reload($('region').value);
 </script>
+<script src="/remote.js"></script>
 </body></html>

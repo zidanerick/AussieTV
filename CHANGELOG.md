@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.0 (16 November 2026)
+- Add remote.js whole-page focus navigation: D-pad/arrow, OK, Back, channel step and numeric entry, with modal focus recovery and a help screen.
+- Add explicit Play/Pause and Mute controls, CSS focus treatment, quick-channel focus preservation and multi-browser-friendly fullscreen fallback.
+- Incorporate verified original channel logos for all curated channels via the image proxy, safe DNS/IP checks and contrast-aware logo backgrounds; retain safe fallback tiles.
+- Add Node keyboard mapping/spatial tests, a mocked headless Chromium browser UI test and future Docker/Jellyfin architectural notes.
+- Local Go test/race detector, Node tests, Chromium mocked UI, Go vet and Windows x64 cross-compilation passed. Live TV playback and real TV remote hardware not yet verified.
+
+
 ## v1.6 (16 November 2026)
 - Add CC/subtitle track selector for streams that expose HLS WebVTT renditions or browser-native caption text tracks.
 - Provide C shortcut, caption-language preference and explicit No captions state; avoid pretending tracks exist.
