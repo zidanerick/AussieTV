@@ -2,7 +2,7 @@
 
 A lightweight, portable Windows 10/11 application for watching Australian free-to-air TV streams with a television-style electronic programme guide (EPG).
 
-**Current source version: v1.5.1.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
+**Current source version: v1.6.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
 
 ## Run
 
@@ -72,3 +72,11 @@ The AussieTV logo is original artwork. Network marks and TV programme art belong
 ### Channel-logo reliability (v1.5.1)
 
 ABC NEWS, SBS, SBS2, SBS World Movies, SBS Food and NITV use their feed-provided logos where available. If a remote image is blocked or unavailable, AussieTV uses a bundled, readable SVG identifier tile. These custom tiles are not copies of official artwork. No playback or EPG logic changed.
+
+## Captions and AussieTV Text (v1.6)
+
+When a live stream actually supplies captions, the player shows a **CC track selector**. This supports HLS WebVTT subtitle renditions and browser-exposed in-band caption tracks (such as CEA-608/708 where HLS.js and the browser decode them). Use **C** to toggle a detected track; if no tracks exist, the selector stays unavailable. The preferred subtitle language is saved locally. **No captions are generated or retrieved from third-party subtitle scraping.** The broadcaster's official player may have captions even when AussieTV's third-party stream does not.
+
+Use **TEXT** or **T** to open the Teletext-inspired local information overlay: page **100** index, **200** current programme and next, **300** channel directory, and **400** help. This displays existing EPG data; it is not a decoder for original broadcast Teletext/Austext (discontinued in 2009).
+
+UI interaction tests were performed in headless Chromium with a synthetic native caption track. Live Australian caption tracks and a native Windows browser window remain unverified. The HLS proxy and channel ingestion were not modified in this version.

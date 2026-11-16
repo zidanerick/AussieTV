@@ -83,6 +83,9 @@
 .empty-favourites{padding:34px 22px;color:#b9cde7;font-size:14px;background:#121d31;border-radius:8px;text-align:center}
 .show-cell:focus-visible,.channel-cell:focus-visible{outline:3px solid #75ddff;outline-offset:-3px;z-index:6}
 @media(max-width:680px){.guide-head,.guide-row{grid-template-columns:150px minmax(0,1fr)}.fav-indicator{display:none}.fav-toggle{padding:5px;font-size:10px}}
+
+/* v1.6: caption selection and Teletext-inspired local information pages. */
+.player-bottom{z-index:32}.player-bottom select{max-width:125px;border:1px solid #536c90;background:#101a30;color:white;padding:7px;border-radius:7px;font-size:12px}.player-bottom select:disabled{color:#98a6ba}.cc-label{align-self:center;padding:0 4px;font-weight:800;font-size:11px;color:#e7f7fc}video::cue{background-color:rgba(0,0,0,.83);color:#fff;text-shadow:0 1px 2px #000;font-family:Arial,sans-serif}.teletext-panel{position:absolute;inset:0;z-index:31;background:#081128ef;color:#e8ebff;padding:22px 24px 65px;overflow:auto;font-family:Consolas,'Lucida Console',monospace}.teletext-panel[hidden]{display:none}.teletext-panel header{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #ffdb44;padding-bottom:10px}.teletext-panel header strong{font-size:19px;color:#ffdb44}.teletext-panel header span{font-size:10px;color:#9cf0ee;align-self:center}.teletext-panel nav{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.teletext-panel nav button{background:#162a54;border:1px solid #39548a;color:#f5f9ff;padding:6px 8px;border-radius:3px;font-size:11px}.teletext-panel nav button.active{background:#e7cb46;color:#10172c}.teletext-panel nav #textClose{margin-left:auto;background:#4b2038}.teletext-panel pre{margin:0;color:#b9f5ff;font-size:clamp(11px,1.15vw,15px);line-height:1.48;white-space:pre-wrap;overflow-wrap:anywhere}.teletext-panel pre::first-line{color:#ffda67;font-weight:bold}@media(max-width:700px){.teletext-panel{padding:12px 12px 70px}.teletext-panel header span{display:none}.teletext-panel nav{gap:3px}.teletext-panel nav button{font-size:10px;padding:4px 6px}.player-bottom{padding:10px 6px}.player-bottom button{font-size:11px;padding:5px}.player-bottom select{max-width:90px;padding:5px;font-size:10px}}
 </style>
 </head>
 <body>
@@ -95,18 +98,18 @@
 </aside>
 <main class="main">
  <div class="topbar">
-  <div><div class="eyebrow">AUSTRALIAN LIVE TELEVISION</div><h1>Watch &amp; Guide <span class="tiny-badge">V1.5</span></h1></div>
+  <div><div class="eyebrow">AUSTRALIAN LIVE TELEVISION</div><h1>Watch &amp; Guide <span class="tiny-badge">V1.6</span></h1></div>
   <div class="top-actions"><span class="clock" id="clock">--:--<small>LOCAL TIME</small></span><select id="region" title="Choose local channel area"><option>Melbourne</option><option>Sydney</option><option>Brisbane</option><option>Adelaide</option><option>Perth</option><option>Hobart</option><option>Canberra</option><option>Darwin</option></select><button class="btn" id="refresh" title="Refresh channels and guide">↻ Refresh</button><button class="btn ghost" id="quit" title="Close AussieTV">✕ Exit</button></div>
  </div>
  <section class="hero">
-  <div class="player" id="player"><video id="video" controls playsinline></video><div class="placeholder" id="placeholder"><div class="placeholder-art" id="placeholderArt"></div><div class="placeholder-shade"></div><img class="placeholder-logo" id="placeholderLogo" alt="" hidden><span class="antenna" id="placeholderAntenna"><img src="/app-icon.svg" alt=""></span><strong id="statusTitle">Preparing live TV</strong><p id="statusText">Loading Australian channels and program listings.</p><button id="retry" class="btn primary" style="display:none">Retry live stream</button></div><div class="status-pill"><span class="pulse"></span> LIVE <span id="playerChannel">TV</span></div><div class="player-bottom"><div><button id="prev" title="Previous channel">‹ Prev</button><button id="next" title="Next channel">Next ›</button></div><div><button id="playlist" title="Download this channel playlist for VLC">M3U</button><button id="fullscreen" title="Fullscreen (F)">⛶ Fullscreen</button></div></div></div>
+  <div class="player" id="player"><video id="video" controls playsinline></video><div class="placeholder" id="placeholder"><div class="placeholder-art" id="placeholderArt"></div><div class="placeholder-shade"></div><img class="placeholder-logo" id="placeholderLogo" alt="" hidden><span class="antenna" id="placeholderAntenna"><img src="/app-icon.svg" alt=""></span><strong id="statusTitle">Preparing live TV</strong><p id="statusText">Loading Australian channels and program listings.</p><button id="retry" class="btn primary" style="display:none">Retry live stream</button></div><div class="status-pill"><span class="pulse"></span> LIVE <span id="playerChannel">TV</span></div><div class="player-bottom"><div><button id="prev" title="Previous channel">‹ Prev</button><button id="next" title="Next channel">Next ›</button></div><div><label class="cc-label" for="captionTrack">CC</label><select id="captionTrack" aria-label="Closed captions or subtitles" title="Subtitles (C)" disabled><option value="off">Unavailable</option></select><button id="textToggle" title="AussieTV Text information (T)" aria-controls="textPanel" aria-expanded="false">TEXT</button><button id="playlist" title="Download this channel playlist for VLC">M3U</button><button id="fullscreen" title="Fullscreen (F)">⛶ Fullscreen</button></div></div><section class="teletext-panel" id="textPanel" aria-label="AussieTV Text information pages" hidden><header><strong>AussieTV TEXT</strong><span>LOCAL GUIDE · NOT BROADCAST TELETEXT</span></header><nav aria-label="Text pages"><button data-textpage="100">100 Home</button><button data-textpage="200">200 On now</button><button data-textpage="300">300 Channels</button><button data-textpage="400">400 Help</button><button id="textClose" aria-label="Close Text">✕</button></nav><pre id="textContent" aria-live="polite"></pre></section></div>
   <div class="now-panel"><div class="now-header"><div class="now-label">● ON AIR NOW</div><button class="btn fav-toggle" id="favourite" aria-pressed="false" title="Save or remove this channel from favourites">☆ Favourite</button></div><div class="now-channel"><span class="now-ident" id="nowIdent">TV</span><div><div class="now-name" id="nowName">Select a channel</div><div class="subtext" id="nowNetwork">Free-to-air television</div></div></div><div class="program-intro" id="programIntro"><div><div class="now-title" id="nowTitle">Choose a channel from the guide</div><div class="program-time" id="nowTime">Guide loading</div></div><div class="poster-frame" id="posterFrame"><img id="nowPoster" alt="Current programme artwork"></div></div><div class="art-credit" id="artCredit">Programme image: <a id="artSource" href="https://www.tvmaze.com/" target="_blank" rel="noreferrer">TVmaze</a></div><div class="progress"><div id="progressBar"></div></div><div class="next-block"><small>UP NEXT</small><div class="next-title" id="nextTitle">Awaiting program information</div><div class="subtext" id="nextTime">&nbsp;</div></div><div class="now-actions"><button class="btn primary" id="watch">▶ Watch live</button><a class="btn" id="official" href="https://iview.abc.net.au/collection/959" target="_blank" rel="noreferrer">↗ Official player</a></div></div>
  </section>
  <section class="quick-channels" id="quickChannels" aria-label="Quick channel selection"></section>
  <div class="notice" id="notice"></div>
  <div class="section-head"><div><div class="section-title">Program guide</div><div class="section-sub" id="guideSubtitle">Now and coming up • Times shown in your computer's time zone</div></div><div class="guide-actions"><button class="btn" id="earlier" aria-label="Earlier programs">‹</button><button class="btn" id="goNow">Now</button><button class="btn" id="later" aria-label="Later programs">›</button></div></div>
  <section class="guide-wrap" aria-label="Television program guide"><div class="guide-head"><div class="guide-label">Channel</div><div class="hours" id="hours"></div></div><div class="guide-body" id="guide"></div></section>
- <div class="footer"><span>Schedule and stream links: <a href="https://i.mjh.nz/au/" target="_blank" rel="noreferrer">mjh.nz</a>. Streams may change or be geo-restricted. Official playback remains available for each network. When available, show artwork is provided by <a href="https://www.tvmaze.com/" target="_blank" rel="noreferrer">TVmaze</a>.</span><span>Keys: ↑ ↓ channel · EPG arrows to browse · Enter select · F fullscreen</span></div>
+ <div class="footer"><span>Schedule and stream links: <a href="https://i.mjh.nz/au/" target="_blank" rel="noreferrer">mjh.nz</a>. Streams may change or be geo-restricted. Official playback remains available for each network. When available, show artwork is provided by <a href="https://www.tvmaze.com/" target="_blank" rel="noreferrer">TVmaze</a>.</span><span>Keys: ↑ ↓ channel · EPG arrows · Enter select · C captions · T Text · F fullscreen</span></div>
 </main></div>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.7.4/dist/hls.min.js" integrity="" crossorigin="anonymous"></script>
 <script>
@@ -114,6 +117,8 @@
 const $ = id => document.getElementById(id);
 const networks=[['All','ALL','#3d78db'],['Favourites','★','#b98b3e'],['ABC','ABC','#1786ce'],['SBS','SBS','#f2a43b'],['Seven','7','#f53d57'],['Nine','9','#2e92f4'],['Ten','10','#cd42b7']];
 let data=null, all=[], visible=[], selected=null, filter='All', hls=null, currentSequence=0, viewStart=null, selectedRegion='Melbourne', isPlaybackStarted=false, playbackTimer=null, mediaRecoveries=0;
+let captionWanted='off', captionChoices=[], textPage=100;
+try{const val=localStorage.getItem('aussietv-caption-language');if(val && /^[a-z]{2,8}(-[a-z0-9]{2,8})*$/.test(val))captionWanted=val}catch{}
 let favorites=new Set();
 try{const saved=JSON.parse(localStorage.getItem('aussietv-favourites')||'[]');if(Array.isArray(saved))favorites=new Set(saved.filter(x=>typeof x==='string').slice(0,100))}catch{}
 function favouriteKey(ch){return ch?.network+'|'+ch?.name}
@@ -180,13 +185,69 @@ function currentProgram(ch){let now=Date.now()/1000;return (ch?.programs||[]).fi
 function nextProgram(ch){let now=Date.now()/1000;return (ch?.programs||[]).find(x=>x.start>now)}
 function setPlaceholder(title,body,retry=false){$('statusTitle').textContent=title;$('statusText').textContent=body;$('retry').style.display=retry?'inline-flex':'none';$('placeholder').style.display='flex'}
 function hidePlaceholder(){$('placeholder').style.display='none'}
-function stopPlayback(){currentSequence++;if(playbackTimer){clearTimeout(playbackTimer);playbackTimer=null}mediaRecoveries=0;if(hls){try{hls.destroy()}catch{ }hls=null}const v=$('video');v.pause();v.removeAttribute('src');v.load();isPlaybackStarted=false;}
+// Caption menu exposes only tracks actually present in the current stream.
+// HLS subtitle renditions use Hls.subtitleTrack; in-band CEA-608/708 tracks
+// are exposed through HTMLMediaElement.textTracks where supported.
+function captionOptions(player=hls,video=$('video')){
+ const out=[];
+ const hlsTracks=player&&Array.isArray(player.subtitleTracks)?player.subtitleTracks:[];
+ for(let i=0;i<hlsTracks.length;i++){
+  const t=hlsTracks[i];out.push({key:'hls:'+i,label:(t.name||t.lang||'Subtitles')+(t.lang?' ('+t.lang+')':''),lang:String(t.lang||'und').toLowerCase(),kind:'hls',index:i});
+ }
+ const list=video?.textTracks;
+ if(list)for(let i=0;i<list.length;i++){
+  const t=list[i];if(t.kind!=='subtitles'&&t.kind!=='captions')continue;
+  const lang=String(t.language||'und').toLowerCase();
+  if(t.kind==='subtitles'&&out.some(x=>x.kind==='hls'&&x.lang===lang))continue;
+  out.push({key:'native:'+i,label:(t.label|| (t.kind==='captions'?'Captions':'Subtitles'))+(lang!=='und'?' ('+lang+')':''),lang,kind:'native',index:i});
+ }
+ return out;
+}
+function clearCaptionTracks(){const list=$('video').textTracks;for(let i=0;list&&i<list.length;i++){try{list[i].mode='disabled'}catch{}}if(hls){try{hls.subtitleDisplay=false;hls.subtitleTrack=-1}catch{}}}
+function resetCaptions(){clearCaptionTracks();captionChoices=[];const menu=$('captionTrack');menu.replaceChildren(new Option('Unavailable','off'));menu.disabled=true;menu.value='off'}
+function chooseCaptionKey(choice){if(!choice)return 'off';return choice.key}
+function applyCaption(key){
+ const selectedChoice=captionChoices.find(x=>x.key===key);clearCaptionTracks();if(!selectedChoice)return;
+ if(selectedChoice.kind==='hls'&&hls){try{hls.subtitleTrack=selectedChoice.index;hls.subtitleDisplay=true}catch{}}
+ if(selectedChoice.kind==='native'){const list=$('video').textTracks;try{if(list[selectedChoice.index])list[selectedChoice.index].mode='showing'}catch{}}
+}
+function refreshCaptionMenu(){
+ const menu=$('captionTrack');if(!menu)return;
+ const choices=captionOptions();captionChoices=choices;
+ const previous=menu.value;
+ const currentlySelected=choices.find(x=>x.key===previous&&previous!=='off');
+ const preferred=captionWanted==='off'?null:(currentlySelected||choices.find(x=>x.lang===captionWanted||x.lang.startsWith(captionWanted+'-')));
+ const next=preferred?preferred.key:'off';
+ const signature=choices.map(x=>x.key+'='+x.label).join('|');
+ if(menu.dataset.signature!==signature){menu.replaceChildren(new Option(choices.length?'Off':'No captions','off'));for(const c of choices)menu.add(new Option(c.label,c.key));menu.dataset.signature=signature}
+ menu.disabled=choices.length===0;
+ if(menu.value!==next){menu.value=next;applyCaption(next)}
+ menu.title=choices.length?('Available caption tracks: '+choices.length+' (C to toggle)'):'No caption tracks in this stream. Try the official player.';
+}
+function setCaptionSelection(key){const choice=captionChoices.find(x=>x.key===key);captionWanted=choice?choice.lang:'off';try{localStorage.setItem('aussietv-caption-language',captionWanted)}catch{}applyCaption(choice?key:'off');$('captionTrack').value=choice?key:'off'}
+function toggleCaptions(){const menu=$('captionTrack');if(menu.disabled)return;setCaptionSelection(menu.value==='off'?captionChoices[0].key:'off')}
+// Teletext-inspired local index assembled from the existing program guide.
+// It is not a decoder for the historical Austext broadcast service.
+function renderTextPanel(){
+ const el=$('textContent');if(!el||$('textPanel').hidden)return;
+ const stamp=new Date().toLocaleString('en-AU',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+ const prog=c=>{const now=currentProgram(c),up=nextProgram(c);return [now?now.title:'No current programme',up?up.title:'No next programme']};
+ let lines=[];
+ if(textPage===100){lines=['AUSTRALIAN FREE-TO-AIR','=======================','','AussieTV Text 100',stamp,'Region: '+selectedRegion,'','100  Home / Index','200  Current channel: now and next','300  Channel listings','400  About and help','','Select a page above. Press T to close.'];}
+ if(textPage===200){const [now,up]=selected?prog(selected):['Not available','Not available'];lines=['200   ON NOW / NEXT','===================','',selected?.name||'No channel selected','','NOW:  '+now,'NEXT: '+up,'','Select a channel in the guide to update this page.'];}
+ if(textPage===300){lines=['300   CHANNEL DIRECTORY','=======================','',...all.slice(0,30).map(c=>String(c.number||'--').padStart(3,' ')+'  '+String(c.name||'')),'','Showing '+Math.min(all.length,30)+' of '+all.length+' channels.'];}
+ if(textPage===400){lines=['400   ABOUT AUSSIE TV TEXT','==========================','','A modern text information overlay, not original','broadcast Teletext or Austext (closed in 2009).','','Listings come from the existing EPG.','CC subtitles require tracks in the IPTV feed.','','C  toggle available subtitles','T  open/close text information','F  fullscreen / ESC close text'];}
+ el.textContent=lines.join('\n');for(const b of document.querySelectorAll('[data-textpage]'))b.classList.toggle('active',Number(b.dataset.textpage)===textPage);
+}
+function toggleText(force){const panel=$('textPanel');const on=typeof force==='boolean'?force:panel.hidden;panel.hidden=!on;$('textToggle').setAttribute('aria-expanded',String(on));if(on)renderTextPanel()}
+
+function stopPlayback(){resetCaptions();currentSequence++;if(playbackTimer){clearTimeout(playbackTimer);playbackTimer=null}mediaRecoveries=0;if(hls){try{hls.destroy()}catch{ }hls=null}const v=$('video');v.pause();v.removeAttribute('src');v.load();isPlaybackStarted=false;}
 function buildQuickChannels(){const wrap=$('quickChannels');wrap.replaceChildren();for(const network of ['ABC','SBS','Seven','Nine','Ten']){const ch=all.find(c=>c.network===network&&(c.name==='ABC TV'||c.name==='SBS'||c.name==='Seven'||c.name==='Channel 9'||c.name==='10'))||all.find(c=>c.network===network);if(!ch)continue;const btn=document.createElement('button');btn.className='quick-card'+(ch.id===selected?.id?' selected':'');btn.dataset.ch=ch.id;const short=network==='ABC'?'ABC':network==='SBS'?'SBS':network==='Seven'?'7':network==='Nine'?'9':'10';btn.append(logoTile(ch,'channel-logo',short));const info=document.createElement('span');info.className='quick-copy';const nm=document.createElement('b');nm.textContent=ch.name;const ep=document.createElement('small');ep.textContent=currentProgram(ch)?.title||'Watch live TV';info.append(nm,ep);btn.append(info);btn.onclick=()=>selectChannel(ch,true);wrap.append(btn)}}
 function syncQuickChannels(){for(const btn of document.querySelectorAll('.quick-card')){btn.classList.toggle('selected',btn.dataset.ch===selected?.id)}}
 function buildFilters(){const wrap=$('filters');const focusedFilter=document.activeElement?.closest?.('.side-item');const focusKey=focusedFilter?.dataset.filter;wrap.replaceChildren();for(const [key,text,bg] of networks){const b=document.createElement('button');b.className='side-item'+(filter===key?' active':'');b.dataset.filter=key;if(key==='All'||key==='Favourites'){const tile=document.createElement('span');tile.className='net-dot';tile.style.background=bg;tile.textContent=key==='Favourites'?'★':'ALL';b.append(tile)}else{b.append(logoTile(all.find(c=>c.network===key&&validImageURL(c.logo))||{network:key},'network-logo',text))}const name=document.createElement('span');name.textContent=key==='All'?'All channels':key;const count=document.createElement('em');count.textContent=key==='All'?all.length:key==='Favourites'?all.filter(isFavourite).length:all.filter(c=>c.network===key).length;b.append(name,count);b.onclick=()=>{filter=key;buildFilters();buildGuide();if(!visible.find(x=>x.id===selected?.id)&&visible.length)selectChannel(visible[0],false)};wrap.append(b)}if(focusKey)wrap.querySelector('[data-filter="'+focusKey+'"]')?.focus({preventScroll:true})}
 function nowDetails(){if(!selected)return;const now=currentProgram(selected),next=nextProgram(selected);const label=selected.network==='ABC'?'ABC':selected.network==='SBS'?'SBS':selected.number;const logoKey=selected.id+':'+selected.logo;
  if($('nowIdent').dataset.logoKey!==logoKey){setChannelLogo($('nowIdent'),selected,label);$('nowIdent').dataset.logoKey=logoKey;setPlaceholderLogo(selected)}
- $('nowName').textContent=selected.name;$('nowNetwork').textContent=selected.network+' network · Channel '+selected.number;$('nowTitle').textContent=now?now.title:'No current listing available';$('nowTime').textContent=now?fmtTime(now.start*1000)+' – '+fmtTime(now.end*1000):'Live broadcast';$('nextTitle').textContent=next?next.title:'No upcoming listing available';$('nextTime').textContent=next?fmtTime(next.start*1000):'';$('progressBar').style.width=now?Math.min(100,Math.max(0,(Date.now()/1000-now.start)/(now.end-now.start)*100))+'%':'0%';$('playerChannel').textContent=selected.name;$('official').href=selected.official;$('playlist').disabled=!selected.stream;syncFavourite();
+ $('nowName').textContent=selected.name;$('nowNetwork').textContent=selected.network+' network · Channel '+selected.number;$('nowTitle').textContent=now?now.title:'No current listing available';$('nowTime').textContent=now?fmtTime(now.start*1000)+' – '+fmtTime(now.end*1000):'Live broadcast';$('nextTitle').textContent=next?next.title:'No upcoming listing available';$('nextTime').textContent=next?fmtTime(next.start*1000):'';$('progressBar').style.width=now?Math.min(100,Math.max(0,(Date.now()/1000-now.start)/(now.end-now.start)*100))+'%':'0%';$('playerChannel').textContent=selected.name;if(!$('textPanel').hidden)renderTextPanel();$('official').href=selected.official;$('playlist').disabled=!selected.stream;syncFavourite();
  const key=selected.id+':'+artKey(now?.title);if(key!==artworkKey)refreshArtwork(selected,now)
 }
 function selectChannel(ch,play=true){if(!ch)return;const was=selected?.id;selected=ch;nowDetails();if(was!==ch.id){stopPlayback();setPlaceholder('Ready: '+ch.name,'Select Watch live to start. If the stream cannot load, use the official broadcaster player.');$('video').style.visibility='hidden'}if(play)playChannel();buildGuide();syncQuickChannels()}
@@ -198,12 +259,15 @@ function playChannel(){if(!selected)return;stopPlayback();const ch=selected;cons
  playbackTimer=setTimeout(()=>fail('The stream did not begin playing within 35 seconds.'),35000);
  if(window.Hls&&Hls.isSupported()){
   hls=new Hls({enableWorker:true,lowLatencyMode:false,backBufferLength:20,maxBufferLength:15,manifestLoadingTimeOut:19000,levelLoadingTimeOut:19000,fragLoadingTimeOut:25000});
-  const player=hls;
+  const player=hls;player.subtitleDisplay=false;player.subtitleTrack=-1;
+  const refresh=()=>{if(seq===currentSequence)refreshCaptionMenu()};
+  player.on(Hls.Events.SUBTITLE_TRACKS_UPDATED,refresh);
+  player.on(Hls.Events.SUBTITLE_TRACK_SWITCH,refresh);
   player.on(Hls.Events.ERROR,(_,err)=>{if(seq!==currentSequence)return;if(err.fatal){if(err.type===Hls.ErrorTypes.MEDIA_ERROR&&mediaRecoveries++<1){try{player.recoverMediaError()}catch{fail('The video format could not be decoded.')}}else{fail(err.type===Hls.ErrorTypes.MEDIA_ERROR?'The video format could not be decoded.':(err.details||'Playback request failed.'))}}});
-  player.on(Hls.Events.MANIFEST_PARSED,()=>{if(seq!==currentSequence)return;video.play().then(()=>{busy(false);hidePlaceholder();isPlaybackStarted=true;if(playbackTimer){clearTimeout(playbackTimer);playbackTimer=null}}).catch(()=>{busy(false);if(playbackTimer){clearTimeout(playbackTimer);playbackTimer=null}setPlaceholder('Press play to begin','Your browser requires a click before starting audio.');$('retry').style.display='inline-flex'})});
+  player.on(Hls.Events.MANIFEST_PARSED,()=>{if(seq!==currentSequence)return;refreshCaptionMenu();video.play().then(()=>{busy(false);hidePlaceholder();isPlaybackStarted=true;if(playbackTimer){clearTimeout(playbackTimer);playbackTimer=null}}).catch(()=>{busy(false);if(playbackTimer){clearTimeout(playbackTimer);playbackTimer=null}setPlaceholder('Press play to begin','Your browser requires a click before starting audio.');$('retry').style.display='inline-flex'})});
   player.attachMedia(video);player.on(Hls.Events.MEDIA_ATTACHED,()=>player.loadSource(path));
  }else if(video.canPlayType('application/vnd.apple.mpegurl')){
-  video.src=path;video.play().then(()=>{hidePlaceholder();busy(false)}).catch(()=>fail('Playback was blocked by the browser.'))
+  video.src=path;refreshCaptionMenu();video.play().then(()=>{hidePlaceholder();busy(false)}).catch(()=>fail('Playback was blocked by the browser.'))
  }else {fail('HLS playback library could not load. Check internet access or use VLC.')}
  video.onplaying=()=>{if(seq===currentSequence){busy(false);hidePlaceholder();isPlaybackStarted=true;if(playbackTimer){clearTimeout(playbackTimer);playbackTimer=null}}};
  video.onerror=()=>{if(seq===currentSequence)fail('The browser could not play this stream.')}
@@ -222,7 +286,10 @@ async function reload(region,autoplay=false){selectedRegion=region;try{localStor
  catch(err){showNotice('Unable to load channels: '+err.message);$('connectionState').textContent='Guide unavailable';setPlaceholder('Could not load guide','Check internet access and click Refresh.')}finally{busy(false)}
 }
 function navigate(delta){if(!visible.length)return;let pos=visible.findIndex(x=>x.id===selected?.id);pos=(pos+delta+visible.length)%visible.length;selectChannel(visible[pos],true)}
-$('favourite').onclick=toggleFavourite;$('refresh').onclick=()=>reload(selectedRegion,false);$('region').onchange=e=>{filter='All';reload(e.target.value,false)};$('watch').onclick=playChannel;$('retry').onclick=playChannel;$('prev').onclick=()=>navigate(-1);$('next').onclick=()=>navigate(1);$('playlist').onclick=()=>{if(selected?.stream)location.href='/channel.m3u?region='+encodeURIComponent(selectedRegion)+'&ch='+encodeURIComponent(selected.id)};$('fullscreen').onclick=()=>{const p=$('player');if(document.fullscreenElement)document.exitFullscreen();else p.requestFullscreen()};$('earlier').onclick=()=>{viewStart=(viewStart??Math.floor(Date.now()/1800000)*1800000)-2*3600000;buildGuide()};$('later').onclick=()=>{viewStart=(viewStart??Math.floor(Date.now()/1800000)*1800000)+2*3600000;buildGuide()};$('goNow').onclick=()=>{viewStart=null;buildGuide()};$('quit').onclick=async()=>{stopPlayback();try{await fetch('/api/quit',{method:'POST',keepalive:true})}catch{};window.close();document.body.innerHTML='<div style="padding:60px;font:20px Segoe UI;color:white;background:#0a0e18">AussieTV has stopped. You can close this window.</div>'};
+$('favourite').onclick=toggleFavourite;$('refresh').onclick=()=>reload(selectedRegion,false);$('region').onchange=e=>{filter='All';reload(e.target.value,false)};$('watch').onclick=playChannel;$('retry').onclick=playChannel;$('prev').onclick=()=>navigate(-1);$('next').onclick=()=>navigate(1);$('captionTrack').onchange=e=>{setCaptionSelection(e.target.value)};
+$('textToggle').onclick=()=>toggleText();$('textClose').onclick=()=>toggleText(false);for(const b of document.querySelectorAll('[data-textpage]'))b.onclick=()=>{textPage=Number(b.dataset.textpage);renderTextPanel()};
+$('video').textTracks?.addEventListener?.('addtrack',refreshCaptionMenu);$('video').textTracks?.addEventListener?.('removetrack',refreshCaptionMenu);
+$('playlist').onclick=()=>{if(selected?.stream)location.href='/channel.m3u?region='+encodeURIComponent(selectedRegion)+'&ch='+encodeURIComponent(selected.id)};$('fullscreen').onclick=()=>{const p=$('player');if(document.fullscreenElement)document.exitFullscreen();else p.requestFullscreen()};$('earlier').onclick=()=>{viewStart=(viewStart??Math.floor(Date.now()/1800000)*1800000)-2*3600000;buildGuide()};$('later').onclick=()=>{viewStart=(viewStart??Math.floor(Date.now()/1800000)*1800000)+2*3600000;buildGuide()};$('goNow').onclick=()=>{viewStart=null;buildGuide()};$('quit').onclick=async()=>{stopPlayback();try{await fetch('/api/quit',{method:'POST',keepalive:true})}catch{};window.close();document.body.innerHTML='<div style="padding:60px;font:20px Segoe UI;color:white;background:#0a0e18">AussieTV has stopped. You can close this window.</div>'};
 // EPG navigation behaves like a television remote. Do not intercept Enter on
 // actual buttons/links: that previously prevented keyboard activation.
 function moveGuideFocus(active,key){
@@ -243,6 +310,9 @@ document.addEventListener('keydown',e=>{
  if(target.matches?.('#guide .show-cell,#guide .channel-cell')&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
   e.preventDefault();moveGuideFocus(target,e.key);return;
  }
+ if(e.key==='Escape'&&!$('textPanel').hidden){e.preventDefault();toggleText(false);return}
+ if(e.key.toLowerCase()==='c'&&!target.closest?.('button,a,select,video,[role="button"]')){e.preventDefault();toggleCaptions();return}
+ if(e.key.toLowerCase()==='t'&&!target.closest?.('button,a,select,video,[role="button"]')){e.preventDefault();toggleText();return}
  if(e.key.toLowerCase()==='f'&&!target.matches?.('input,textarea')){e.preventDefault();$('fullscreen').click();return}
  // Respect native Enter/Space, arrows and focus on interactive controls.
  if(target.closest?.('button,a,select,video,[role="button"]'))return;

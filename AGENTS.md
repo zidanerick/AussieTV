@@ -21,3 +21,6 @@
 15. The preferred branded app window is Edge/Chrome `--app`, not a native WebView. Preserve the default browser and console fallbacks, and avoid claiming a fixed browser taskbar identity.
 
 14. Keep v1.5.1's bundled channel-logo fallbacks and their allowlisted SVG routes; retain the feed-provided logo as preferred artwork. Test the broken-remote-image path when changing logo rendering.
+
+15. For v1.6+ captions, never claim a live stream carries captions merely because the broadcaster captions its terrestrial broadcasts or official player. UI should only list actual tracks exposed in the current source and remain off by default. Preserve and test Hls.subtitleTrack/HTMLMediaElement.textTracks selection, and distinguish simulated browser tracks from real broadcasts.
+16. AussieTV Text 100/200/300/400 is a simulated locally-generated information overlay. Do not describe it as receiving Austext or legacy broadcast teletext packets. Preserve the original HTML/CSS interface and local fallback launch behavior.
