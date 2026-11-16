@@ -1,4 +1,4 @@
-AussieTV v1.5 - Live Australian Television for Windows
+AussieTV v1.5.1 - Live Australian Television for Windows
 ======================================================
 
 WHAT'S NEW IN V1.2
@@ -80,3 +80,9 @@ NEW IN v1.5
 - Set AUSSIE_TV_BROWSER_MODE=default before launching for normal browser
   tabs instead. The console/log and URL fallback remain available.
 - The app window remains browser-owned, not an independent native WebView.
+
+NEW IN v1.5.1
+- Local fallback channel tiles for ABC NEWS, SBS, SBS2,
+  SBS World Movies, SBS Food and NITV.
+- Existing broadcaster/feed logos are preferred whenever they load.
+- Playback remains unchanged.
