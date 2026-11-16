@@ -1,7 +1,7 @@
 # AussieTV project continuity / future-chat handoff
 
 **Last documented:** 16 November 2026  
-**Current code:** v1.5 on `main`  
+**Current code:** v1.5.1 on `main`  
 **Repository:** https://github.com/zidanerick/AussieTV
 
 ## User goal
@@ -93,3 +93,10 @@ If a change is made, update this document with: exact commit SHA, affected files
 ## v1.5 handoff
 
 Before each Windows build run `go run ./tools/iconbuilder`, which produces `rsrc_windows_amd64.syso` (ignored by Git). Then run `go test ./...` and compile for Windows amd64. Keep the existing console launcher and default browser fallback. Windows EXE icon is verified by PE structure inspection, not native Windows Explorer UI. Do not claim a separate native window, as Edge/Chrome still provides the app window.
+
+## v1.5.1 channel logo repair (16 November 2026)
+
+- Six locally bundled fallback channel identifiers at `static/channel-logo-*.svg`, served by the existing allowlisted asset handler.
+- Mapping and browser image-error recovery in `static/index.html`: ABC NEWS, SBS, SBS2, SBS World Movies, SBS Food and NITV. The original feed URL remains the first choice.
+- Tests: local Go unit tests and race detector passed; Windows x64 cross-compiled; SVG syntax and JS syntax validated. Headless browser navigation blocked by the test environment; no native Windows verification yet. No change to HLS proxy or playback.
+- Next: confirm logo fallback for each named channel on Windows, particularly when upstream artwork URLs fail.

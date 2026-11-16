@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200" role="img" aria-label="SBS 2">
+ <rect width="400" height="200" rx="24" fill="#0F1B2F"/>
+ <path d="M0 0 H400 V15 H0Z" fill="#FF935F"/>
+ <rect x="16" y="29" width="7" height="142" rx="3" fill="#FF935F"/>
+ <text x="48" y="104" font-size="111" font-family="Arial, Segoe UI, sans-serif" font-weight="900" fill="#FFFFFF" letter-spacing="-3">SBS</text>
+ <text x="51" y="160" font-size="50" font-family="Arial, Segoe UI, sans-serif" font-weight="800" fill="#FF935F" letter-spacing="0.3">2</text>
+</svg>

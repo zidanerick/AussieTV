@@ -168,6 +168,12 @@ func TestAppBrandingRoutes(t *testing.T) {
 		"/favicon-32.png": "image/png", "/favicon-192.png": "image/png",
 		"/favicon.ico": "image/x-icon",
 		"/site.webmanifest": "application/manifest+json",
+		"/channel-logo-abc-news.svg": "image/svg+xml",
+		"/channel-logo-sbs.svg": "image/svg+xml",
+		"/channel-logo-sbs2.svg": "image/svg+xml",
+		"/channel-logo-sbs-world-movies.svg": "image/svg+xml",
+		"/channel-logo-sbs-food.svg": "image/svg+xml",
+		"/channel-logo-nitv.svg": "image/svg+xml",
 	}
 	for path, typ := range cases {
 		w := httptest.NewRecorder()

@@ -125,9 +125,46 @@ const colors={ABC:'#167dcc',SBS:'#f1aa39',Seven:'#e32f4e',Nine:'#1479d4',Ten:'#b
 // Images are drawn from the live channel feed. Use actual artwork when present,
 // and restore an easily readable branded tile when an image cannot be loaded.
 function validImageURL(u){try{const url=new URL(u);return (url.protocol==='https:'||url.protocol==='http:')&&!!url.hostname}catch{return false}}
-function logoTile(ch,cl,short){const wrap=document.createElement('span');wrap.className=cl;const back=document.createElement('span');back.className='logo-fallback';back.textContent=short;back.style.background=colors[ch?.network]||'#336bb0';wrap.append(back);if(ch&&validImageURL(ch.logo)){const img=document.createElement('img');img.className='logo-image';img.alt='';img.loading='lazy';img.decoding='async';img.onload=()=>{back.style.display='none'};img.onerror=()=>{img.remove();back.style.display='grid'};img.src=ch.logo;wrap.append(img)}return wrap}
+// Some feed-provided logo hosts reject embedded browser images. Keep a
+// bundled channel-specific SVG as a second choice for the affected stations.
+// The bundled marks are readable identifier tiles, not copies of official art.
+function localChannelLogo(ch){
+ const name=String(ch?.name||'').trim().toLowerCase().replace(/\s+/g,' ');
+ if(ch?.network==='ABC' && ['abc news','abc news 24','abc news channel'].includes(name))return '/channel-logo-abc-news.svg';
+ if(ch?.network!=='SBS')return '';
+ const paths={'sbs':'sbs','sbs2':'sbs2','sbs viceland':'sbs2','sbs world movies':'sbs-world-movies','sbs food':'sbs-food','nitv':'nitv'};
+ return paths[name]?'/channel-logo-'+paths[name]+'.svg':'';
+}
+function channelLogoSources(ch){
+ const urls=[];
+ if(ch&&validImageURL(ch.logo))urls.push(ch.logo);
+ const local=localChannelLogo(ch);
+ if(local)urls.push(local);
+ return urls;
+}
+function loadChannelLogo(img,ch,loaded,failed){
+ const sources=channelLogoSources(ch);let nextIndex=0;
+ img.onload=loaded;
+ img.onerror=()=>{if(nextIndex<sources.length)img.src=sources[nextIndex++];else failed()};
+ if(sources.length)img.src=sources[nextIndex++];else failed();
+}
+function logoTile(ch,cl,short){
+ const wrap=document.createElement('span');wrap.className=cl;
+ const back=document.createElement('span');back.className='logo-fallback';back.textContent=short;
+ back.style.background=colors[ch?.network]||'#336bb0';wrap.append(back);
+ if(channelLogoSources(ch).length){
+  const img=document.createElement('img');img.className='logo-image';img.alt='';img.loading='lazy';img.decoding='async';wrap.append(img);
+  loadChannelLogo(img,ch,()=>{back.style.display='none'},()=>{img.remove();back.style.display='grid'});
+ }
+ return wrap;
+}
 function setChannelLogo(element,ch,short){const tile=logoTile(ch,'now-ident',short);element.replaceChildren(...Array.from(tile.childNodes));element.style.background='transparent'}
-function setPlaceholderLogo(ch){const img=$('placeholderLogo'),ant=$('placeholderAntenna');if(ch&&validImageURL(ch.logo)){img.hidden=false;img.style.display='block';img.src=ch.logo;img.onerror=()=>{img.style.display='none';ant.style.display='block'};ant.style.display='none'}else{img.hidden=true;img.removeAttribute('src');ant.style.display='block'}}
+function setPlaceholderLogo(ch){
+ const img=$('placeholderLogo'),ant=$('placeholderAntenna');
+ img.style.display='none';ant.style.display='block';img.hidden=true;
+ if(!channelLogoSources(ch).length){img.removeAttribute('src');return}
+ loadChannelLogo(img,ch,()=>{img.hidden=false;img.style.display='block';ant.style.display='none'},()=>{img.hidden=true;img.style.display='none';ant.style.display='block'});
+}
 function cleanArtworkTitle(raw){return String(raw||'').trim().replace(/\s+(?:s\d{1,3}\s*(?:ep\.?|e)\s*\d+.*|season\s+\d+.*|series\s+\d+.*)$/i,'').replace(/\s+\(\d{4}\)$/,'').trim()}
 function artKey(title){return cleanArtworkTitle(title).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
 function applyArtwork(art,ch){const valid=!!(art&&validImageURL(art.poster));$('programIntro').classList.toggle('has-art',valid);const img=$('nowPoster');if(valid){img.src=art.poster;img.onerror=()=>{if(selected?.id===ch.id){applyArtwork(null,ch)}};$('artSource').href=validImageURL(art.page)?art.page:'https://www.tvmaze.com/';$('artSource').textContent='TVmaze';$('placeholderArt').style.backgroundImage='url('+JSON.stringify(art.poster)+')';$('placeholderArt').style.display='block'}else{img.removeAttribute('src');$('placeholderArt').style.backgroundImage='none';$('placeholderArt').style.display='none'}

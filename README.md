@@ -2,7 +2,7 @@
 
 A lightweight, portable Windows 10/11 application for watching Australian free-to-air TV streams with a television-style electronic programme guide (EPG).
 
-**Current source version: v1.5.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
+**Current source version: v1.5.1.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
 
 ## Run
 
@@ -51,7 +51,7 @@ Package `AussieTV.exe`, `RUN-AussieTV.cmd`, `README.txt` and `assets/AussieTV.ic
 | v1.2 | [versions/v1.2](https://github.com/zidanerick/AussieTV/tree/versions/v1.2) | Real channel logos, programme posters, updated guide |
 | v1.3 | [versions/v1.3](https://github.com/zidanerick/AussieTV/tree/versions/v1.3) | Favourites, remote-style guide navigation, playback timeout and stream proxy safeguards |
 | v1.4 | [versions/v1.4](https://github.com/zidanerick/AussieTV/tree/versions/v1.4) | Original app logo, browser favicon, multi-size Windows shortcut icon and brand asset tooling |
-| v1.5 | `main` | Embedded Windows EXE icon and app-style window launch with reliable fallback |
+| v1.5.1 | `main` | Embedded Windows EXE icon and app-style window launch with reliable fallback |
 
 Full details: [CHANGELOG.md](CHANGELOG.md).
 
@@ -59,7 +59,7 @@ Full details: [CHANGELOG.md](CHANGELOG.md).
 
 AussieTV does not operate or own television streams. The channel index and guide come from [i.mjh.nz](https://i.mjh.nz/au/), which can change or be unavailable. Browser-based HLS playback also depends on an externally loaded HLS.js library. Some broadcasters restrict streams using authentication, DRM or region rules: use the supplied official broadcaster links in those cases. TVmaze art is optional and won't match all programmes. Melbourne listings may differ from Gippsland local feeds.
 
-**Validation:** The v1.5 Go resource generator, tests and Windows cross-build passed on Linux; direct PE resource inspection confirmed seven icon sizes. Native Windows app-mode/taskbar behaviour remains unverified. Earlier validation:  Go tests, race detector, Windows cross-compilation, localhost HTTP checks, and headless Chromium UI interaction checks (with mocked channel data) passed in Linux. Actual free-to-air stream playback, Windows launcher behaviour for v1.3 and the Windows UI have not been independently verified on a Windows PC. Saved favourites use browser localStorage for this application's local address.
+**Validation:** The v1.5.1 Go resource generator, tests and Windows cross-build passed on Linux; direct PE resource inspection confirmed seven icon sizes. Native Windows app-mode/taskbar behaviour remains unverified. Earlier validation:  Go tests, race detector, Windows cross-compilation, localhost HTTP checks, and headless Chromium UI interaction checks (with mocked channel data) passed in Linux. Actual free-to-air stream playback, Windows launcher behaviour for v1.3 and the Windows UI have not been independently verified on a Windows PC. Saved favourites use browser localStorage for this application's local address.
 
 ## Working on this project in a future chat
 
@@ -68,3 +68,7 @@ Begin with [docs/CONTINUITY.md](docs/CONTINUITY.md) and [AGENTS.md](AGENTS.md). 
 ## Attribution
 
 The AussieTV logo is original artwork. Network marks and TV programme art belong to their respective owners. TVmaze API artwork is attributed in the application. Project license: see [LICENSE](LICENSE).
+
+### Channel-logo reliability (v1.5.1)
+
+ABC NEWS, SBS, SBS2, SBS World Movies, SBS Food and NITV use their feed-provided logos where available. If a remote image is blocked or unavailable, AussieTV uses a bundled, readable SVG identifier tile. These custom tiles are not copies of official artwork. No playback or EPG logic changed.

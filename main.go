@@ -33,7 +33,7 @@ import (
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
-const version = "1.5"
+const version = "1.5.1"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -278,7 +278,7 @@ func loadChannels(region string) ChannelData {
 		return old.data
 	}
 	req, _ := http.NewRequest("GET", sourceBase+region+"/tv.json", nil)
-	req.Header.Set("User-Agent", "AussieTV/1.5 (+personal local player)")
+	req.Header.Set("User-Agent", "AussieTV/1.5.1 (+personal local player)")
 	response, err := client.Do(req)
 	if err == nil && response.StatusCode != 200 {
 		err = fmt.Errorf("EPG server HTTP %d", response.StatusCode)
@@ -632,6 +632,9 @@ func serveAppAsset(w http.ResponseWriter, r *http.Request) {
 		path, contentType = "static/favicon.ico", "image/x-icon"
 	case "/site.webmanifest":
 		path, contentType = "static/site.webmanifest", "application/manifest+json"
+	case "/channel-logo-abc-news.svg", "/channel-logo-sbs.svg", "/channel-logo-sbs2.svg",
+		"/channel-logo-sbs-world-movies.svg", "/channel-logo-sbs-food.svg", "/channel-logo-nitv.svg":
+		path, contentType = "static"+r.URL.Path, "image/svg+xml"
 	default:
 		http.NotFound(w, r)
 		return

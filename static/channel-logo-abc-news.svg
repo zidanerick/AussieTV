@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200" role="img" aria-label="ABC NEWS">
+ <rect width="400" height="200" rx="24" fill="#1048B8"/>
+ <path d="M0 0 H400 V15 H0Z" fill="#5DD2FD"/>
+ <rect x="16" y="29" width="7" height="142" rx="3" fill="#5DD2FD"/>
+ <text x="48" y="104" font-size="84" font-family="Arial, Segoe UI, sans-serif" font-weight="900" fill="#FFFFFF" letter-spacing="-3">ABC</text>
+ <text x="51" y="160" font-size="74" font-family="Arial, Segoe UI, sans-serif" font-weight="800" fill="#5DD2FD" letter-spacing="0.3">NEWS</text>
+</svg>

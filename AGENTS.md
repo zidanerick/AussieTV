@@ -19,3 +19,5 @@
 
 14. Run `go run ./tools/iconbuilder` before building; it generates `rsrc_windows_amd64.syso` with the embedded EXE icon. Keep generator tests and inspect the icon resource on cross-built executables.
 15. The preferred branded app window is Edge/Chrome `--app`, not a native WebView. Preserve the default browser and console fallbacks, and avoid claiming a fixed browser taskbar identity.
+
+14. Keep v1.5.1's bundled channel-logo fallbacks and their allowlisted SVG routes; retain the feed-provided logo as preferred artwork. Test the broken-remote-image path when changing logo rendering.

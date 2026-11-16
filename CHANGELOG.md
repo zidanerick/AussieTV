@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.1 (16 November 2026)
+- Add bundled SVG fallback tiles for ABC NEWS, SBS, SBS2, SBS World Movies, SBS Food and NITV.
+- When a feed-provided logo is missing or fails to load, use a local channel-specific identifier tile rather than a generic network block.
+- Add allowlisted routes for SVGs and server tests; playback unchanged.
+- Verified local Go tests, race detector, Windows x64 cross-compilation, SVG parsing and JS syntax. Native Windows display not yet verified.
+
+
 ## v1.5 (16 November 2026)
 - Embed a multi-size native Windows executable icon (16 to 256 px) with a reproducible Go-generated PE resource, without external tools or runtime dependencies.
 - Prefer app-style Edge/Chrome windows and retain the proven default-browser fallback. Add an environment switch for normal browser tabs.
