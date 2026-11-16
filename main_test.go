@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"net/http/httptest"
-	"time"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCuratedChannelMapping(t *testing.T) {
@@ -115,85 +115,98 @@ func TestArtworkExactMatching(t *testing.T) {
 }
 
 func TestStreamProxyOnlyAllowsListedRootOrSignedManifestResources(t *testing.T) {
-    channel := Channel{ID: "channel-abc", Stream: "https://cdn.example.net/live/master.m3u8"}
-    if !permittedStream(channel, channel.Stream, "") {
-        t.Fatal("listed channel stream must be accepted without a signature")
-    }
-    segment := "https://media.example.org/path/segment01.ts?auth=shortlived"
-    if permittedStream(channel, segment, "") {
-        t.Fatal("arbitrary untrusted segment was accepted")
-    }
-    signature := streamSignature(channel.ID, segment)
-    if !permittedStream(channel, segment, signature) {
-        t.Fatal("valid signed manifest resource was rejected")
-    }
-    if permittedStream(channel, segment+"&extra=1", signature) || permittedStream(Channel{ID: "channel-other"}, segment, signature) {
-        t.Fatal("signature was reusable against a different URL or channel")
-    }
-    if permittedStream(channel, segment, "NOT-HEX") {
-        t.Fatal("nonhex signature was accepted")
-    }
-    if link := playlistURL(channel.ID, segment); !strings.Contains(link, "&sig=") {
-        t.Fatalf("playlist proxy URL is unsigned: %s", link)
-    }
+	channel := Channel{ID: "channel-abc", Stream: "https://cdn.example.net/live/master.m3u8"}
+	if !permittedStream(channel, channel.Stream, "") {
+		t.Fatal("listed channel stream must be accepted without a signature")
+	}
+	segment := "https://media.example.org/path/segment01.ts?auth=shortlived"
+	if permittedStream(channel, segment, "") {
+		t.Fatal("arbitrary untrusted segment was accepted")
+	}
+	signature := streamSignature(channel.ID, segment)
+	if !permittedStream(channel, segment, signature) {
+		t.Fatal("valid signed manifest resource was rejected")
+	}
+	if permittedStream(channel, segment+"&extra=1", signature) || permittedStream(Channel{ID: "channel-other"}, segment, signature) {
+		t.Fatal("signature was reusable against a different URL or channel")
+	}
+	if permittedStream(channel, segment, "NOT-HEX") {
+		t.Fatal("nonhex signature was accepted")
+	}
+	if link := playlistURL(channel.ID, segment); !strings.Contains(link, "&sig=") {
+		t.Fatalf("playlist proxy URL is unsigned: %s", link)
+	}
 }
 
 func TestHLSProxyRejectsUnlistedStreamBeforeFetching(t *testing.T) {
-    cacheMu.Lock()
-    old := cache
-    cache = map[string]cacheEntry{"Test": {data: ChannelData{Channels: []Channel{{ID: "abc", Stream: "https://example.org/master.m3u8"}}}}}
-    cacheMu.Unlock()
-    defer func() { cacheMu.Lock(); cache = old; cacheMu.Unlock() }()
-    request := httptest.NewRequest(http.MethodGet, "/hls?ch=abc&u=https%3A%2F%2Fexample.org%2Fforged.ts", nil)
-    result := httptest.NewRecorder()
-    hlsHandler(result, request)
-    if result.Code != http.StatusForbidden {
-        t.Fatalf("got HTTP %d, want 403 for forged address", result.Code)
-    }
+	cacheMu.Lock()
+	old := cache
+	cache = map[string]cacheEntry{"Test": {data: ChannelData{Channels: []Channel{{ID: "abc", Stream: "https://example.org/master.m3u8"}}}}}
+	cacheMu.Unlock()
+	defer func() { cacheMu.Lock(); cache = old; cacheMu.Unlock() }()
+	request := httptest.NewRequest(http.MethodGet, "/hls?ch=abc&u=https%3A%2F%2Fexample.org%2Fforged.ts", nil)
+	result := httptest.NewRecorder()
+	hlsHandler(result, request)
+	if result.Code != http.StatusForbidden {
+		t.Fatalf("got HTTP %d, want 403 for forged address", result.Code)
+	}
 }
 
 func TestSafeDialRejectsPrivateHostBeforeConnecting(t *testing.T) {
-    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-    defer cancel()
-    conn, err := safeDial(ctx, "tcp", "localhost:80")
-    if conn != nil { conn.Close(); t.Fatal("should not connect to localhost") }
-    if err == nil { t.Fatal("did not reject localhost resolution") }
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, err := safeDial(ctx, "tcp", "localhost:80")
+	if conn != nil {
+		conn.Close()
+		t.Fatal("should not connect to localhost")
+	}
+	if err == nil {
+		t.Fatal("did not reject localhost resolution")
+	}
 }
 
-// Branding assets must be embedded in the executable and correctly typed.
+// Branding assets must be embedded in the executable and served with the
+// right content types so Chrome/Edge can use the app icon and favicon.
 func TestAppBrandingRoutes(t *testing.T) {
 	cases := map[string]string{
-		"/": "text/html", "/app-icon.svg": "image/svg+xml",
-		"/aussietv-logo.svg": "image/svg+xml",
-		"/favicon-32.png": "image/png", "/favicon-192.png": "image/png",
-		"/favicon.ico": "image/x-icon",
-		"/site.webmanifest": "application/manifest+json",
-		"/channel-logo-abc-news.svg": "image/svg+xml",
-		"/channel-logo-sbs.svg": "image/svg+xml",
-		"/channel-logo-sbs2.svg": "image/svg+xml",
-		"/channel-logo-sbs-world-movies.svg": "image/svg+xml",
-		"/channel-logo-sbs-food.svg": "image/svg+xml",
-		"/channel-logo-nitv.svg": "image/svg+xml",
+		"/": "text/html", "/app-icon.svg": "image/svg+xml", "/aussietv-logo.svg": "image/svg+xml", "/favicon-32.png": "image/png", "/favicon-192.png": "image/png", "/favicon.ico": "image/x-icon", "/site.webmanifest": "application/manifest+json",
+		"/remote.js": "application/javascript",
+		"/channel-logo-abc-news.svg": "image/svg+xml", "/channel-logo-sbs.svg": "image/svg+xml", "/channel-logo-sbs2.svg": "image/svg+xml",
+		"/channel-logo-sbs-world-movies.svg": "image/svg+xml", "/channel-logo-sbs-food.svg": "image/svg+xml", "/channel-logo-nitv.svg": "image/svg+xml",
 	}
-	for path, typ := range cases {
+	for path, contentType := range cases {
+		r := httptest.NewRequest(http.MethodGet, path, nil)
 		w := httptest.NewRecorder()
-		serveAppAsset(w, httptest.NewRequest(http.MethodGet, path, nil))
-		if w.Code != http.StatusOK { t.Errorf("GET %s status: %d", path, w.Code); continue }
-		if got := w.Header().Get("Content-Type"); !strings.HasPrefix(got,typ) { t.Errorf("GET %s content type: %s", path, got) }
-		if w.Body.Len()==0 { t.Errorf("GET %s empty", path) }
+		serveAppAsset(w, r)
+		if w.Code != http.StatusOK {
+			t.Errorf("GET %s: status %d", path, w.Code)
+			continue
+		}
+		if got := w.Header().Get("Content-Type"); !strings.HasPrefix(got, contentType) {
+			t.Errorf("GET %s: unexpected content type %s", path, got)
+		}
+		if w.Body.Len() == 0 {
+			t.Errorf("GET %s: empty body", path)
+		}
 	}
-	w:=httptest.NewRecorder()
-	serveAppAsset(w,httptest.NewRequest(http.MethodGet, "/not-a-route",nil))
-	if w.Code!=http.StatusNotFound {t.Fatalf("unexpected route accepted: %d",w.Code)}
+	w := httptest.NewRecorder()
+	serveAppAsset(w, httptest.NewRequest(http.MethodGet, "/not-a-route", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("unexpected asset route accepted: %d", w.Code)
+	}
 }
 
 func TestWindowsBrowserCandidatesHaveBrowserExecutables(t *testing.T) {
- t.Setenv("ProgramFiles(x86)","C:/Program Files (x86)")
- t.Setenv("ProgramFiles","C:/Program Files")
- t.Setenv("LOCALAPPDATA","C:/Users/Test/AppData/Local")
- paths:=windowsBrowserCandidates()
- if len(paths)!=6 {t.Fatalf("want 6 Edge/Chrome candidates, got %d: %v",len(paths),paths)}
- for _,p:=range paths {
-  if !strings.HasSuffix(strings.ToLower(p),"msedge.exe") && !strings.HasSuffix(strings.ToLower(p),"chrome.exe") {t.Fatalf("unexpected browser: %s",p)}
- }
+	t.Setenv("ProgramFiles(x86)", `C:\Program Files (x86)`)
+	t.Setenv("ProgramFiles", `C:\Program Files`)
+	t.Setenv("LOCALAPPDATA", `C:\Users\Test\AppData\Local`)
+	candidates := windowsBrowserCandidates()
+	if len(candidates) != 6 {
+		t.Fatalf("want 6 Edge/Chrome locations, got %d: %v", len(candidates), candidates)
+	}
+	for _, c := range candidates {
+		if !strings.HasSuffix(strings.ToLower(c), "msedge.exe") && !strings.HasSuffix(strings.ToLower(c), "chrome.exe") {
+			t.Fatalf("unexpected browser executable: %s", c)
+		}
+	}
 }

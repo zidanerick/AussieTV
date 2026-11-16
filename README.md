@@ -2,7 +2,7 @@
 
 A lightweight, portable Windows 10/11 application for watching Australian free-to-air TV streams with a television-style electronic programme guide (EPG).
 
-**Current source version: v1.6.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
+**Current source version: v1.7.0.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
 
 ## Run
 
@@ -11,6 +11,10 @@ Download a **Windows build artifact** from the latest successful [GitHub Actions
 If your browser does not open, visit `http://127.0.0.1:45781`. If the port is occupied, use the alternate address printed by the application. Logs are written to `%LOCALAPPDATA%\AussieTV\startup.log`.
 
 ## Features
+
+- Full TV remote navigation using D-pad, OK, Back, channel up/down, numeric tuning and a remote-help overlay; use keyboard or remote bridge that emits browser key events.
+- Player-controlled Play/Pause and Mute for browsers with inconsistent native media controls, plus high-contrast focus and resilient guide focus.
+- Real upstream logo images for all curated channels through a guarded local image endpoint; artwork contrast adapts to light/dark marks.
 
 - Australian channels from ABC, SBS, Seven, Nine and Network 10, with selected secondary channels
 - Television grid guide, channel selection, programme descriptions and shortcuts
@@ -80,3 +84,7 @@ When a live stream actually supplies captions, the player shows a **CC track sel
 Use **TEXT** or **T** to open the Teletext-inspired local information overlay: page **100** index, **200** current programme and next, **300** channel directory, and **400** help. This displays existing EPG data; it is not a decoder for original broadcast Teletext/Austext (discontinued in 2009).
 
 UI interaction tests were performed in headless Chromium with a synthetic native caption track. Live Australian caption tracks and a native Windows browser window remain unverified. The HLS proxy and channel ingestion were not modified in this version.
+
+## Remote controls and future integrations (v1.7)
+
+Read [TV remote and browser compatibility](docs/REMOTE.md) and [Docker/Jellyfin integration roadmap](docs/INTEGRATIONS.md). Only Chromium interaction with mock guide data was tested; actual smart-TV remote key support and other browser playback modes are not yet verified. Current app remains localhost-only and does not expose a Jellyfin plugin or secure Docker-hosted network API.

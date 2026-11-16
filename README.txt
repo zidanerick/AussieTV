@@ -1,4 +1,4 @@
-AussieTV v1.6 - Live Australian Television for Windows
+AussieTV v1.7 - Live Australian Television for Windows
 ======================================================
 
 WHAT'S NEW IN V1.2
@@ -12,8 +12,8 @@ WHAT'S NEW IN V1.2
 RUNNING ON WINDOWS 10/11
 1. Extract the complete ZIP to a folder.
 2. Double-click RUN-AussieTV.cmd (recommended), or AussieTV.exe.
-3. An Edge/Chrome app-style window opens when available. Otherwise the
-   normal default browser opens. If no window appears, visit:
+3. An Edge/Chrome app-style window opens when available; otherwise
+   Windows uses your default browser. If no window opens, visit:
    http://127.0.0.1:45781
 4. Keep the command window running while watching TV.
 5. Select a channel in the guide or use the five large quick-tune buttons.
@@ -68,24 +68,29 @@ NEW IN v1.3
 The TV guide is community supplied, and actual Windows broadcaster streaming is not verified.
 
 NEW IN v1.4
-- Original AussieTV play-screen logo and favicon throughout the application.
-- Browser favicon, install icon and local site manifest.
-- Multi-size AussieTV.ico included in the Windows ZIP for shortcut icons.
-- Icon generator source is kept with the repository and runs during CI.
+- Original AussieTV play-screen icon and SVG logo, used throughout the interface.
+- Browser favicon, 192px install icon, and site manifest; works offline after launch.
+- AussieTV.ico included in the Windows ZIP for shortcuts, independent of
+  broadcaster channel logos.
+- Logo artwork and icon-generation source kept in the GitHub repository.
+
 
 NEW IN v1.5
-- AussieTV.exe embeds its Windows Explorer/shortcut icon directly.
-- Microsoft Edge or Google Chrome opens a separate app-style window when
-  installed; otherwise the ordinary default browser is used.
-- Set AUSSIE_TV_BROWSER_MODE=default before launching for normal browser
-  tabs instead. The console/log and URL fallback remain available.
-- The app window remains browser-owned, not an independent native WebView.
+- Windows Explorer and shortcuts now show AussieTV's icon directly from
+  AussieTV.exe, without needing a separate custom icon file.
+- Prefer a browser app-style window on Microsoft Edge or Google Chrome,
+  with an AussieTV page title and favicon, instead of a regular browser tab.
+- If you prefer your default browser's ordinary tabs, set
+  AUSSIE_TV_BROWSER_MODE=default before running RUN-AussieTV.cmd.
+- The v1.1 default-browser fallback and console diagnostics remain intact.
+- A browser app window is still hosted by the browser; its taskbar identity
+  may be controlled by Edge/Chrome and Windows. It is not a native WebView2
+  executable.
 
 NEW IN v1.5.1
-- Local fallback channel tiles for ABC NEWS, SBS, SBS2,
-  SBS World Movies, SBS Food and NITV.
-- Existing broadcaster/feed logos are preferred whenever they load.
-- Playback remains unchanged.
+- Local artwork fallbacks for ABC NEWS, SBS, SBS2, SBS World Movies,
+  SBS Food and NITV when the remote channel logos fail or are missing.
+- Playback code and channel stream URLs are unchanged.
 
 NEW IN V1.6
 - HLS subtitle and closed-caption selector (only tracks available in the live stream).
@@ -93,3 +98,11 @@ NEW IN V1.6
 - Press T or click TEXT for a Teletext-style local program information display.
   This uses the existing EPG and is NOT original broadcast Teletext.
 - No artificial subtitles are generated. If none are present, CC is unavailable.
+
+AUSSIETV v1.7: REMOTE / CROSS-BROWSER INPUT
+- Arrow/D-pad moves focus across sidebar, quick channels, guide, player controls, captions, Text pages and settings.
+- OK/Enter activates the highlighted item; Back/Escape closes overlays or returns to the guide.
+- CH+/CH- or PageUp/PageDown change channels. Numeric remote keys enter a channel number.
+- H opens the remote help screen, M opens network filters, G returns to the guide.
+- Hardware special keys must be delivered to the browser by the TV OS or remote adapter.
+- HLS playback is provided through Hls.js or native HLS where the browser supports it.

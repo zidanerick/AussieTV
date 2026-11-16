@@ -1,7 +1,7 @@
 # AussieTV project continuity / future-chat handoff
 
 **Last documented:** 16 November 2026  
-**Current code:** v1.6 on `main`  
+**Current code:** v1.7.0 on `main`  
 **Repository:** https://github.com/zidanerick/AussieTV
 
 ## User goal
@@ -109,3 +109,11 @@ Before each Windows build run `go run ./tools/iconbuilder`, which produces `rsrc
 - Existing stream proxy and safety checks unchanged; only front-end plus version and docs changed.
 - Local: Go tests and race detector pass; JS syntax check passes; browser UI smoke using mocked EPG and injected native caption track passes. Windows x64 cross-compilation passed. No native Windows or real broadcast caption testing yet.
 - Next: test ABC News, ABC TV, SBS and commercial network caption selector on actual Windows streams; capture a per-channel caption capability table. Determine if DVB-T support is needed for any original broadcast-only captions.
+
+## v1.7 remote-control integration (16 November 2026)
+
+- Added `static/remote.js` (whole-interface D-pad/OK/Back, numeric tune, CH+/-, guide, filters and overlays), high-contrast focus and explicit player play/mute buttons.
+- The browser UI remains a client of same-origin relative API URLs, facilitating future host/service separation. Current process still uses localhost-only binding, auto quit/heartbeat and desktop browser launch, **not safe to expose as-is to the LAN**.
+- Integrated prior all-channel logo proxy work via `logo.go` and `logo_test.go`, including DNS restrictions and bounded image cache. No HLS proxy logic was changed.
+- Automated checks: `go test -race ./...`, `go vet ./...`, `node --test tests/remote_keys.test.cjs`, `python tests/remote_browser_smoke.py` with mocked TV schedules, and Windows x64 Go build. All passed locally; Firefox/Safari, real streams and TV hardware not verified.
+- Roadmap in `docs/REMOTE.md` and `docs/INTEGRATIONS.md`. For Jellyfin, validate standard M3U+XMLTV Live TV integration before building a new plugin.
