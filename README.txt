@@ -1,4 +1,4 @@
-AussieTV v1.7 - Live Australian Television for Windows
+AussieTV v1.7.1 - Live Australian Television for Windows
 ======================================================
 
 WHAT'S NEW IN V1.2
@@ -106,3 +106,10 @@ AUSSIETV v1.7: REMOTE / CROSS-BROWSER INPUT
 - H opens the remote help screen, M opens network filters, G returns to the guide.
 - Hardware special keys must be delivered to the browser by the TV OS or remote adapter.
 - HLS playback is provided through Hls.js or native HLS where the browser supports it.
+
+NEW IN v1.7.1
+- The D-pad's left/right navigation stays on one visual row, including
+  player controls and program guide cells.
+- Focused Region/CC dropdowns change only after pressing OK to edit:
+  Up/Down adjusts a candidate, OK applies it and Back cancels it.
+- Browser playback and the existing Windows launcher are unchanged.

@@ -27,3 +27,5 @@
 
 17. v1.7 remote UI lives in `static/remote.js`. Preserve D-pad/OK/Back and help modal behavior, spatial focus, native select support, quick tile/guide focus on redraw and numeric entry. Run Node remote tests and browser mock integration for UI changes.
 18. A separate Docker server mode must change localhost-only lifecycle and authentication/Host/Origin assumptions before exposure; avoid trivial 0.0.0.0 binding. Jellyfin supports M3U/XMLTV without a plugin. See docs/INTEGRATIONS.md.
+
+15. In v1.7.1 and later, keep remote left/right within the visual control row, prevent guide-edge fallthrough, and require an explicit OK-to-edit mode for region/CC selectors with Back cancel and OK commit. Regression-test all four cases across at least two viewport widths; do not restore implicit select arrow changes.

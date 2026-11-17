@@ -21,7 +21,7 @@ test('TV remote and keyboard key aliases',()=>{
   [{key:'8'},'8'],[{key:'Unidentified',keyCode:33},'PageUp']
  ])assert.equal(r.keyOf(event),want,JSON.stringify(event));
 });
-function rect(left,top,width=80,height=40){return {left,top,width,height}}
+function rect(left,top,width=80,height=40){return {left,top,width,height,right:left+width,bottom:top+height}}
 function element(box){return {
  disabled:false,closest(){return false},getBoundingClientRect(){return box}
 }}
@@ -44,4 +44,15 @@ test('disabled, hidden, and zero-size elements are never navigation targets',()=
  const zero=element(rect(250,0,0,0));const real=element(rect(400,0));
  const scope={querySelectorAll(){return [start,hidden,disabled,zero,real]}};
  assert.equal(r.nearest(start,'ArrowRight',scope),real);
+});
+
+test('left and right never jump diagonally to another visual row',()=>{
+ const from=element(rect(100,100));
+ const nextRow=element(rect(180,180));
+ const aligned=element(rect(360,104));
+ const scope={querySelectorAll(){return [from,nextRow,aligned]}};
+ assert.equal(r.nearest(from,'ArrowRight',scope),aligned);
+ assert.equal(r.nearest(aligned,'ArrowLeft',scope),from);
+ const onlyDiagonal={querySelectorAll(){return [from,nextRow]}};
+ assert.equal(r.nearest(from,'ArrowRight',onlyDiagonal),null);
 });
