@@ -30,7 +30,7 @@ thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
 with sync_playwright() as pw:
  import os
  browser=pw.chromium.launch(executable_path=os.environ.get('AUSSIETV_CHROMIUM') or '/usr/bin/chromium',headless=True,args=['--no-sandbox','--disable-gpu'])
- context=browser.new_context(viewport={'width':1280,'height':800})
+ context=browser.new_context(viewport={'width':int(os.environ.get('AUSSIETV_TEST_WIDTH','1280')),'height':800})
  page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  import re
  html=(ROOT/'static/index.html').read_text()
@@ -80,7 +80,44 @@ with sync_playwright() as pw:
  assert page.locator('#remoteHelpPanel').is_visible()
  page.locator('#remoteHelpClose').click()
  assert not page.locator('#remoteHelpPanel').is_visible()
+ # Guide boundaries are hard edges: left/right cannot escape into the player.
+ first_channel=page.locator('#guide .channel-cell').first
+ first_channel.focus()
+ page.keyboard.press('ArrowLeft')
+ assert page.evaluate('document.activeElement.classList.contains("channel-cell")')
+ page.locator('#guide .show-cell').last.focus()
+ focused_before=page.evaluate('document.activeElement.outerHTML')
+ page.keyboard.press('ArrowRight')
+ assert page.evaluate('document.activeElement.outerHTML')==focused_before
+ # The player is its own horizontal control group.
+ page.locator('#playPause').focus()
+ page.keyboard.press('ArrowRight')
+ assert page.evaluate('document.activeElement.id')=='mute'
+ # Simply focusing a native dropdown must never change its value with arrows.
+ page.locator('#region').focus()
+ assert page.locator('#region').input_value()=='Melbourne'
+ page.keyboard.press('ArrowRight')
+ assert page.evaluate('document.activeElement.id')=='remoteHelp'
+ assert page.locator('#region').input_value()=='Melbourne'
+ page.locator('#region').focus()
+ page.keyboard.press('ArrowDown')
+ assert page.locator('#region').input_value()=='Melbourne'
+ assert page.evaluate('document.activeElement.id')!='region'
+ # Explicit select editing: OK, direction, Back to discard; OK to commit.
+ page.locator('#region').focus()
+ page.keyboard.press('Enter')
+ assert page.locator('#region').evaluate('(e)=>e.classList.contains("remote-select-editing")')
+ page.keyboard.press('ArrowDown')
+ assert page.locator('#region').input_value()=='Sydney'
+ page.keyboard.press('Escape')
+ assert page.locator('#region').input_value()=='Melbourne'
+ assert page.evaluate('document.activeElement.id')=='region'
+ page.keyboard.press('Enter')
+ page.keyboard.press('ArrowDown')
+ page.keyboard.press('Enter')
+ assert page.locator('#region').input_value()=='Sydney'
+ page.locator('#guide .channel-cell').first.wait_for(timeout=20000)
  assert not errors, errors
- print('PASS: focus navigation, guide selection, sidebar, dialog Back, Text, numeric channel tuning, no page errors')
+ print('PASS: grid boundaries, strict player row, no accidental region changes, select edit/cancel/apply, existing remote features')
  browser.close()
 server.shutdown()

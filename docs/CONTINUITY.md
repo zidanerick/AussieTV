@@ -117,3 +117,10 @@ Before each Windows build run `go run ./tools/iconbuilder`, which produces `rsrc
 - Integrated prior all-channel logo proxy work via `logo.go` and `logo_test.go`, including DNS restrictions and bounded image cache. No HLS proxy logic was changed.
 - Automated checks: `go test -race ./...`, `go vet ./...`, `node --test tests/remote_keys.test.cjs`, `python tests/remote_browser_smoke.py` with mocked TV schedules, and Windows x64 Go build. All passed locally; Firefox/Safari, real streams and TV hardware not verified.
 - Roadmap in `docs/REMOTE.md` and `docs/INTEGRATIONS.md`. For Jellyfin, validate standard M3U+XMLTV Live TV integration before building a new plugin.
+
+## v1.7.1 remote-control navigation correction (17 November 2026)
+
+- **Reason:** v1.7 used full-page nearest-element navigation when a guide move hit its boundary; focus could jump diagonally into the player or other shows. Region and caption `<select>` elements used native arrows even during ordinary D-pad navigation, inadvertently changing settings.
+- **Implementation:** `static/remote.js` restricts horizontal moves to the same visible row and local control group. A guide boundary does not fall through to global navigation. Region and CC selects have explicit OK-to-edit, up/down preview, OK-to-commit, Back/Escape cancel. `static/index.html` adds edit-state highlighting and UI help.
+- **Tests:** Go unit and race, Node remote unit, mocked Chromium at 1280x800 and 768x800, and Windows x64 cross-build passed locally. No real device or broadcaster playback test performed.
+- **Future:** Docker/Jellyfin server-mode work remains separate and must retain these remote-navigation semantics.

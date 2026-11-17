@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.7.1 (17 November 2026)
+- Keep D-pad horizontal navigation within a single visible row and control group; programme-guide row boundaries no longer fall through to page-wide spatial navigation.
+- Require explicit OK-to-edit for Region/CC selectors; Up/Down changes a draft choice, OK commits, Back/Escape cancels without dispatching change.
+- Fix select Back recovery and retain mouse/touch controls.
+- Add Node unit and Chromium mocked UI regression checks at desktop and narrower layouts; Go race checks and Windows x64 build passed locally. Physical remotes, Firefox/Safari and live streams remain unverified.
+
+
 ## v1.7.0 (16 November 2026)
 - Add remote.js whole-page focus navigation: D-pad/arrow, OK, Back, channel step and numeric entry, with modal focus recovery and a help screen.
 - Add explicit Play/Pause and Mute controls, CSS focus treatment, quick-channel focus preservation and multi-browser-friendly fullscreen fallback.

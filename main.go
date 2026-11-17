@@ -33,7 +33,7 @@ import (
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
-const version = "1.7.0"
+const version = "1.7.1"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -297,7 +297,7 @@ func loadChannels(region string) ChannelData {
 		return old.data
 	}
 	req, _ := http.NewRequest("GET", sourceBase+region+"/tv.json", nil)
-	req.Header.Set("User-Agent", "AussieTV/1.7.0 (+personal local player)")
+	req.Header.Set("User-Agent", "AussieTV/1.7.1 (+personal local player)")
 	response, err := client.Do(req)
 	if err == nil && response.StatusCode != 200 {
 		err = fmt.Errorf("EPG server HTTP %d", response.StatusCode)

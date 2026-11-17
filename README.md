@@ -2,7 +2,7 @@
 
 A lightweight, portable Windows 10/11 application for watching Australian free-to-air TV streams with a television-style electronic programme guide (EPG).
 
-**Current source version: v1.7.0.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
+**Current source version: v1.7.1.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
 
 ## Run
 
@@ -88,3 +88,7 @@ UI interaction tests were performed in headless Chromium with a synthetic native
 ## Remote controls and future integrations (v1.7)
 
 Read [TV remote and browser compatibility](docs/REMOTE.md) and [Docker/Jellyfin integration roadmap](docs/INTEGRATIONS.md). Only Chromium interaction with mock guide data was tested; actual smart-TV remote key support and other browser playback modes are not yet verified. Current app remains localhost-only and does not expose a Jellyfin plugin or secure Docker-hosted network API.
+
+### v1.7.1 remote navigation repair
+
+Left/right now stays inside the same visual row and control group, and guide edge navigation no longer jumps to unrelated player controls. Region and caption dropdowns require **OK to edit**, **Up/Down to choose**, **OK to apply**, and **Back/Escape to cancel**, without changing the region merely from focus navigation. See [docs/REMOTE.md](docs/REMOTE.md). The portable Windows launcher and playback code are otherwise unchanged.

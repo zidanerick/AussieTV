@@ -1,4 +1,4 @@
-# AussieTV v1.7 remote-control and browser compatibility
+# AussieTV v1.7.1 remote-control and browser compatibility
 
 The existing TV interface can now be operated without a mouse when a remote emits keyboard events through HDMI-CEC, a Bluetooth/USB remote, a PC remote bridge or an embedded TV webview. This is a web application, not a native Samsung/LG/Android TV app. The TV OS may reserve special keys instead of delivering them to webpages.
 
@@ -6,9 +6,9 @@ The existing TV interface can now be operated without a mouse when a remote emit
 
 | Key / button | Action |
 | --- | --- |
-| Arrow keys / D-pad | Move spatially between visible controls and through programme cells |
-| OK, Select, Enter | Activate the highlighted control |
-| Back, Escape, Backspace | Close help/Text/fullscreen or return to guide |
+| Arrow keys / D-pad | Left/right stays in a visual row; up/down moves between rows and guide channels |
+| OK, Select, Enter | Activate an item, or start/commit editing a region/subtitle selector |
+| Back, Escape, Backspace | Cancel selector editing, close overlays/fullscreen or return to guide |
 | CH+/CH-, Page Up/Page Down | Previous/next channel |
 | Numbers | Enter broadcast channel number (e.g. 2 then 4 for ABC News 24); commits after about 1 second |
 | G, Home | Jump to guide |
@@ -19,7 +19,7 @@ The existing TV interface can now be operated without a mouse when a remote emit
 | F | Fullscreen, where the browser permits it |
 | Space or media Play/Pause | Toggle stream playback; Space activates a focused button |
 
-**In-app controls**: the player also exposes Play/Pause and Mute buttons. All buttons, links, favourites, source regions, CC selector and Text pages remain accessible via D-pad/OK. Native HTML `<select>` controls use Up/Down for options and Back to return to normal navigation. The help overlay traps D-pad navigation until closed.
+**In-app controls**: the player also exposes Play/Pause and Mute buttons. All buttons, links, favourites, source regions, CC selector and Text pages remain accessible via D-pad/OK. Region and CC `<select>` controls do **not** change when arrows move focus. Press **OK** to enter edit mode (green focus ring), **Up/Down** to preview a different option, **OK** again to commit and **Back/Escape** to cancel. Normal mouse/touch selection still works. The help overlay traps D-pad navigation until closed.
 
 Visual focus uses a high-contrast yellow outline. Scrolling is performed when focus moves, including inside the guide. Programme guide navigation retains time proximity when moving between channels.
 
@@ -47,3 +47,5 @@ The Python test renders HTML in memory with mocked guide JSON, avoiding network 
 - Firefox, Safari/WebKit and Edge manual compatibility matrix and HLS/DRM playback validation.
 - Make the programme guide more efficient with large channel counts; track focus restoration when channel data is refreshed concurrently.
 - Use an authenticated network host when Docker mode is implemented. Existing desktop-only endpoints, heartbeat and localhost security rules are *not* ready to expose to a LAN.
+
+**v1.7.1:** Horizontal navigation is deliberately limited to visually aligned controls, and guide boundary arrows do not jump to the player. Regression tests use mocked programmes and two Chromium viewport widths. Other browsers and physical TV remotes still need direct validation.

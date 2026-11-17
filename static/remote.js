@@ -1,4 +1,4 @@
-/* AussieTV TV remote and keyboard navigation, v1.7. No external dependencies.
+/* AussieTV TV remote and keyboard navigation, v1.7.1. No external dependencies.
  * Native buttons/links/selects remain accessible for touch, mouse and keyboard.
  * Can be reused in a later container-hosted web UI. */
 (function(){
@@ -8,6 +8,7 @@
  const directions={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'};
  const legacyKeys={37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown',13:'Enter',27:'Escape',8:'Back',4:'Back',461:'Back',10009:'Back',427:'ChannelUp',428:'ChannelDown',33:'PageUp',34:'PageDown',179:'MediaPlayPause'};
  let modalReturn=null, textReturn=null, numeric='',numericTimer=null,hudTimer=null;
+ let editingSelect=null,selectOriginalValue='';
  function keyOf(event){
   const key=event.key;
   if(key && key!=='Unidentified' && key!=='Dead' && key!=='Process'){
@@ -52,48 +53,93 @@
   const hud=$('remoteHud');hud.textContent=msg;hud.hidden=false;
   clearTimeout(hudTimer);hudTimer=setTimeout(hideHud,ms);
  }
+ // In remote mode horizontal movement is deliberately kept inside a single
+ // visual control group. A small diagonal distance must not jump to the video
+ // controls or another guide row merely because its centre is closer.
+ const horizontalZones='.top-actions,#filters,.player-bottom,.now-actions,#quickChannels,.guide-actions,.teletext-panel nav,.remote-help-box';
+ function horizontalZone(el){return el.closest?.(horizontalZones)||null}
+ function sameVisualRow(a,b){
+  const overlap=Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top);
+  return overlap>=Math.max(2,Math.min(a.height,b.height)*.40);
+ }
  function nearest(current,key,scope){
-  const list=candidates(scope).filter(el=>el!==current);
   const from=current.getBoundingClientRect();
   const fx=from.left+from.width/2,fy=from.top+from.height/2;
+  const horizontal=(key==='ArrowLeft'||key==='ArrowRight');
+  const zone=horizontal?horizontalZone(current):null;
+  const list=candidates(scope).filter(el=>el!==current&&(!zone||zone.contains(el)));
   let best=null,score=Infinity;
   const direction=directions[key];
   for(const node of list){
    const rect=node.getBoundingClientRect();const x=rect.left+rect.width/2,y=rect.top+rect.height/2;
    const parallel=direction==='left'?fx-x:direction==='right'?x-fx:direction==='up'?fy-y:y-fy;
    if(parallel<3)continue;
-   const orthogonal=direction==='left'||direction==='right'?Math.abs(y-fy):Math.abs(x-fx);
-   const cross=direction==='left'||direction==='right'?(from.height+rect.height)/2:(from.width+rect.width)/2;
-   // Strongly prefer items in the same row/column, while allowing the
-   // remote to move between the sidebar, controls, player, and EPG.
+   if(horizontal&&!sameVisualRow(from,rect))continue;
+   const orthogonal=horizontal?Math.abs(y-fy):Math.abs(x-fx);
+   const cross=horizontal?(from.height+rect.height)/2:(from.width+rect.width)/2;
    const penalty=orthogonal>cross?orthogonal-cross:0;
    const result=parallel+orthogonal*.45+penalty*2.8;
    if(result<score){score=result;best=node}
   }
   return best;
  }
+ function beginSelect(select){
+  if(!select||select.disabled)return;
+  editingSelect=select;selectOriginalValue=select.value;
+  select.classList.add('remote-select-editing');
+  if(!select.hasAttribute('data-remote-base-label'))select.setAttribute('data-remote-base-label',select.getAttribute('aria-label')||'');
+  select.setAttribute('aria-label',(select.getAttribute('aria-label')||select.title||'Selection')+'. Editing: up/down change, OK applies, Back cancels');
+  notice('Editing '+(select.id==='region'?'region':'captions')+': ▲/▼ change, OK apply, Back cancel',3200);
+ }
+ function finishSelect(commit){
+  if(!editingSelect)return;
+  const node=editingSelect,changed=node.value!==selectOriginalValue;
+  editingSelect=null;node.classList.remove('remote-select-editing');
+  const base=node.getAttribute('data-remote-base-label');
+  if(base!==null){if(base)node.setAttribute('aria-label',base);else node.removeAttribute('aria-label');node.removeAttribute('data-remote-base-label')}
+  else if(node.id==='region'){node.removeAttribute('aria-label')}
+  if(commit){
+   if(changed)node.dispatchEvent(new Event('change',{bubbles:true}));
+   notice('Selected '+node.options[node.selectedIndex]?.textContent,1200);
+  }else{
+   node.value=selectOriginalValue;
+   notice('Selection cancelled',1100);
+  }
+ }
+ function stepSelect(key){
+  if(!editingSelect)return;
+  const options=Array.from(editingSelect.options);
+  let idx=editingSelect.selectedIndex,delta=key==='ArrowDown'?1:key==='ArrowUp'?-1:0;
+  if(!delta)return;
+  do {idx+=delta} while(idx>=0&&idx<options.length&&options[idx].disabled);
+  if(idx>=0&&idx<options.length)editingSelect.selectedIndex=idx;
+  notice((editingSelect.options[editingSelect.selectedIndex]?.textContent||'')+' · OK to apply · Back to cancel',2500);
+ }
  function move(key){
   const scope=isDialogOpen()?$('remoteHelpPanel'):(!$('textPanel').hidden?$('textPanel'):document);
-  let active=document.activeElement;
-  if(!usable(active)||!scope.contains(active)||!active.matches(focusable)){scrollFocus(isDialogOpen()||!$('textPanel').hidden?firstFocusable(scope):guideFocus());return}
+  const active=document.activeElement;
+  if(!usable(active)||!scope.contains(active)||!active.matches(focusable)){
+   // Avoid a jump to a programme when the browser hands focus to native video.
+   const playerControl=active===$('video')?firstFocusable(document.querySelector('.player-bottom')):null;
+   scrollFocus(playerControl||(isDialogOpen()||!$('textPanel').hidden?firstFocusable(scope):guideFocus()));return;
+  }
   if(!isDialogOpen()&&$('textPanel').hidden&&active.matches('#guide .channel-cell,#guide .show-cell')){
-   const initial=active;
+   // The guide is a logical grid: at its edges, stay put instead of jumping
+   // diagonally to the player or unrelated controls.
    moveGuideFocus(active,key);
-   if(document.activeElement!==initial){
-    const destination=document.activeElement;
-    try{destination.scrollIntoView({block:'nearest',inline:'nearest'})}catch{}
-    return;
-   }
+   if(document.activeElement!==active)scrollFocus(document.activeElement);
+   return;
   }
   const next=nearest(active,key,scope);
   if(next)scrollFocus(next);
  }
  function back(){
+  if(editingSelect){finishSelect(false);return}
   if(isDialogOpen()){showHelp(false);return}
   if(!$('textPanel').hidden){showText(false);return}
   if(document.fullscreenElement||document.webkitFullscreenElement){try{(document.exitFullscreen||document.webkitExitFullscreen).call(document)}catch{}return}
   const active=document.activeElement;
-  if(active?.tagName==='SELECT'){scrollFocus($('remoteHelp'));return}
+  if(active?.tagName==='SELECT'){scrollFocus(guideFocus());return}
   if(active?.closest('#guide')){scrollFocus($('watch'));return}
   scrollFocus(guideFocus());
  }
@@ -132,7 +178,7 @@
  function activateFocused(){
   const active=document.activeElement;
   if(usable(active)&&active.matches('button,a')){active.click();return}
-  if(usable(active)&&active.matches('select')){active.focus();return}
+  if(usable(active)&&active.matches('select')){beginSelect(active);return}
   if(usable(active)&&active.matches('[role="button"]')){active.click();return}
   scrollFocus(guideFocus());
  }
@@ -150,15 +196,17 @@
    event.preventDefault();event.stopImmediatePropagation();back();return;
   }
   if(directions[key]){
-   // Browser-native dropdowns must retain their own arrow key handling.
-   if(source?.tagName==='SELECT'&&!overlay)return;
-   event.preventDefault();event.stopImmediatePropagation();move(key);return;
+   event.preventDefault();event.stopImmediatePropagation();
+   if(editingSelect){stepSelect(key);return}
+   move(key);return;
   }
   if(key==='Enter'||key===' '){
-   if(source?.tagName==='SELECT')return;
-   if(key===' '&&!source?.matches?.('button,a,[role="button"]')){event.preventDefault();toggleMedia();return}
-   event.preventDefault();event.stopImmediatePropagation();activateFocused();return;
+   event.preventDefault();event.stopImmediatePropagation();
+   if(editingSelect){finishSelect(true);return}
+   if(key===' '&&!source?.matches?.('button,a,[role="button"],select')){toggleMedia();return}
+   activateFocused();return;
   }
+  if(editingSelect){finishSelect(false)}
   if(overlay){
    if((key==='t'||key==='T')&&!isDialogOpen()){event.preventDefault();showText(false)}
    if(key==='h'||key==='H'){event.preventDefault();showHelp(!isDialogOpen())}
@@ -179,6 +227,9 @@
  // Capture before built-in browser arrow scrolling and native media handlers;
  // normal click/touch events still activate every existing control.
  document.addEventListener('keydown',handle,true);
+ document.addEventListener('focusin',event=>{
+  if(editingSelect&&event.target!==editingSelect)finishSelect(false);
+ });
  $('remoteHelp').addEventListener('click',()=>showHelp(true));
  $('remoteHelpClose').addEventListener('click',()=>showHelp(false));
  $('textToggle').addEventListener('click',()=>{
@@ -194,5 +245,5 @@
  syncMediaControls();
  // Expose pure-ish primitives to the browser integration tests without
  // creating a separate dependency on a browser framework.
- window.AussieTVRemote={keyOf,nearest,candidates,move,back,showHelp,showText,guideFocus};
+ window.AussieTVRemote={keyOf,nearest,candidates,move,back,showHelp,showText,guideFocus,sameVisualRow,horizontalZone};
 })();
