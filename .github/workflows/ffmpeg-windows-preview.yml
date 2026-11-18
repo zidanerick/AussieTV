@@ -27,7 +27,8 @@ jobs:
           if ($exe.Count -ne 1) { throw "Expected exactly one ffmpeg.exe; found $($exe.Count)" }
           New-Item -ItemType Directory -Path portable/ffmpeg -Force | Out-Null
           Copy-Item $exe[0].FullName portable/ffmpeg/ffmpeg.exe
-          $ver = & ./portable/ffmpeg/ffmpeg.exe -version | Select-Object -First 1
+          $versionLines = & ./portable/ffmpeg/ffmpeg.exe -version
+          $ver = $versionLines | Select-Object -First 1
           if ($LASTEXITCODE -ne 0) { throw 'FFmpeg binary could not run on Windows' }
           @("Source: $url", "Archive SHA-256: $actual", "Version: $ver", "Static FFmpeg Essentials build is licensed GPLv3.", "Upstream source: https://ffmpeg.org/download.html", "Build recipes: https://github.com/GyanD/codexffmpeg") | Set-Content -Path portable/ffmpeg/BUILD-INFO.txt -Encoding UTF8
           foreach ($license in Get-ChildItem upstream -Recurse -File | Where-Object { $_.Name -match '^(LICENSE|COPYING)(\.[a-zA-Z0-9_-]+)?$' }) {
