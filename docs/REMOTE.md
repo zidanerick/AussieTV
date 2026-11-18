@@ -1,3 +1,5 @@
+> **Version note (v0.1.0-beta.1):** This document may describe pre-beta v1.x/v2.x prototypes. Current Windows beta status and support boundaries are in [README](../README.md) and [Known issues](BETA-KNOWN-ISSUES.md).
+
 # AussieTV v1.7.1 remote-control and browser compatibility
 
 The existing TV interface can now be operated without a mouse when a remote emits keyboard events through HDMI-CEC, a Bluetooth/USB remote, a PC remote bridge or an embedded TV webview. This is a web application, not a native Samsung/LG/Android TV app. The TV OS may reserve special keys instead of delivering them to webpages.

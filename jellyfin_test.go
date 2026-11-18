@@ -66,7 +66,14 @@ func TestJellyfinM3UXMLTVMatch(t *testing.T) {
 		t.Fatalf("wrong timezone")
 	}
 	encoded := base64.RawURLEncoding.EncodeToString([]byte("mjh:abc/news"))
-	redir := requestJellyfin(t, h, "/jellyfin/stream/"+encoded+"?key="+url.QueryEscape(cfg.Key), "GET")
+	if !strings.Contains(playlist.Body.String(), "/jellyfin/stream/"+encoded+".m3u8?") {
+		t.Fatal("M3U feed must identify HLS playlist by extension")
+	}
+	head := requestJellyfin(t, h, "/jellyfin/stream/"+encoded+".m3u8?key="+url.QueryEscape(cfg.Key), "HEAD")
+	if head.Code != http.StatusOK || head.Header().Get("Content-Type") != "application/vnd.apple.mpegurl" || head.Body.Len() != 0 {
+		t.Fatalf("HEAD must answer immediately without following upstream redirect: %d %v", head.Code, head.Header())
+	}
+	redir := requestJellyfin(t, h, "/jellyfin/stream/"+encoded+".m3u8?key="+url.QueryEscape(cfg.Key), "GET")
 	if redir.Code != http.StatusTemporaryRedirect || redir.Header().Get("Location") != "https://streams.example.org/live.m3u8?token=demo" {
 		t.Fatalf("bad stream redirect: %d %v", redir.Code, redir.Header())
 	}

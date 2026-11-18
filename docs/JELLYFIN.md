@@ -1,58 +1,70 @@
-# AussieTV v1.8: Jellyfin IPTV tuner and programme guide
+# Jellyfin integration: AussieTV v0.1.0-beta.1
 
-Jellyfin natively supports **M3U tuners + XMLTV guide providers**. That is the integration used here. It does not claim to emulate an HDHomeRun tuner, perform SSDP/UPnP discovery, or transcode video to MPEG-TS. No Jellyfin plugin needs to be installed.
+**The dependable integration is manually configured M3U/XMLTV with direct HLS
+redirect.** The HDHomeRun emulator and FFmpeg MPEG-TS are experiments, not
+part of the stable beta acceptance criteria.
 
-## Endpoints
+## Setup
 
-The optional feed listener exposes only these authenticated GET endpoints:
+Use the AussieTV notification-area Settings command to enable **Jellyfin
+feed**. A strong per-install access key is generated and stored in your
+Windows user profile. If Jellyfin is on another PC or server, enable LAN access
+and allow the optional Windows Private/LocalSubnet firewall rule for TCP 45782.
+Never port-forward the feed on your router or expose the API key publicly.
 
-- `/jellyfin/channels.m3u?key=YOUR_KEY` — current regional TV lineup (streamable channels only).
-- `/jellyfin/guide.xml?key=YOUR_KEY` — XMLTV schedule with channel IDs matching the playlist.
-- `/jellyfin/stream/ID?key=YOUR_KEY` — temporary HTTP 307 redirect to the channel's current external stream URL.
-- `/jellyfin/health?key=YOUR_KEY` — `ok` (authentication test).
+In Jellyfin Dashboard > Live TV, select **M3U Tuner**, then use the M3U URL
+shown by AussieTV Settings:
 
-The stream redirect is deliberate for the first integration milestone. Jellyfin/FFmpeg must be capable of playing the upstream HLS stream on its own. Some broadcasters use authentication, custom headers, token expiry, regional restrictions or DRM. Such streams may fail even though the playlist imports correctly. AussieTV cannot bypass restrictions. The external channel provider can also change without warning.
-
-### Windows: opt-in local network feed
-
-For example, on a PC with LAN IP `192.168.1.50`, set these environment variables **before** starting `RUN-AussieTV.cmd`:
-
-```powershell
-$env:AUSSIETV_JELLYFIN_BIND='0.0.0.0:45782'
-$env:AUSSIETV_JELLYFIN_BASE_URL='http://192.168.1.50:45782'
-$env:AUSSIETV_JELLYFIN_KEY='REPLACE-WITH-A-LONG-UNIQUE-RANDOM-TOKEN'
-$env:AUSSIETV_JELLYFIN_REGION='Melbourne'
-.\AussieTV.exe
+```text
+http://YOUR-AUSSIETV-PC:45782/jellyfin/channels.m3u?key=YOUR_KEY
 ```
 
-The desktop app continues listening on `127.0.0.1:45781` and retains the normal browser launcher. The second port, `45782`, exposes *only* the protected Jellyfin feeds, not the UI, heartbeat, shutdown API or unrestricted HLS/image proxy. Allow the port only from Jellyfin's LAN address in the host firewall. The token appears in URLs. Never publish the port to the public internet or share the playlist publicly. For reverse-proxy access, use TLS and additional access controls.
+Add an **XMLTV guide provider** using:
 
-### Docker / Unraid
-
-This is a **feed-only** container for Jellyfin; it does not yet serve the full AussieTV UI on the LAN. To run via Docker Compose, place these lines in `.env` next to `compose.yaml`:
-
-```dotenv
-AUSSIETV_JELLYFIN_BASE_URL=http://192.168.1.50:45782
-AUSSIETV_JELLYFIN_KEY=REPLACE-WITH-A-LONG-UNIQUE-RANDOM-TOKEN
-AUSSIETV_JELLYFIN_REGION=Melbourne
+```text
+http://YOUR-AUSSIETV-PC:45782/jellyfin/guide.xml?key=YOUR_KEY
 ```
 
-Replace the example LAN IP with the **Docker host's reachable LAN IP**, and the key with a random secret of at least 24 characters. Generate a secret, for example, with `openssl rand -hex 24`. Run `docker compose up -d --build`. Port 45782 must be reachable from your Jellyfin server, and must not be exposed to the internet. The container runs as an unprivileged user and persists guide cache to `/data`. If running on Unraid, create a Docker template with the same environment variables and port mapping.
+Use the same region in both feeds. Channel IDs and guide IDs match. Cached
+programme posters are exported where TVmaze has an unambiguous title match;
+Jellyfin clients do not always import programme icons as Primary artwork.
+The bearer key is embedded in both URLs and must be kept private.
 
-### Configure Jellyfin
+## Stream transport modes
 
-1. In Jellyfin Dashboard → **Live TV** → **Tuner Devices** → `+` → choose **M3U Tuner**.
-2. Paste `http://192.168.1.50:45782/jellyfin/channels.m3u?key=YOUR_KEY` and save.
-3. In **TV Guide Data Providers** → `+` → choose **XMLTV**.
-4. Paste `http://192.168.1.50:45782/jellyfin/guide.xml?key=YOUR_KEY` and save.
-5. Refresh guide data and check channel mapping. The generated `tvg-id` and XMLTV `<channel id>` values match exactly.
-6. Test one ABC, SBS, Seven, Nine and 10 channel at a time. A populated guide does **not** prove the videos are playable.
+| Mode | Use | State |
+| --- | --- | --- |
+| `redirect` | Jellyfin opens the broadcaster HLS URL | **Default**; reported working, sometimes 6-11 s startup |
+| `relay` | Authenticated HLS playlist and segments through AussieTV | Experimental; network dependent |
+| `mpegts` | FFmpeg copies HLS video and audio to continuous MPEG-TS | Experimental; SBS audio may be missing or fail startup |
 
-The playlist redirects to public upstream HLS URLs rather than acting as an HDHomeRun transport-stream tuner. Jellyfin's transcoding, recording support, and source restrictions are determined by Jellyfin and each original stream. The M3U/guide endpoints are intentionally bound to a **separate, opt-in authenticated port**.
+Ordinary TV playback does not require FFmpeg. The setup wizard optionally
+fetches FFmpeg and checks its published SHA-256. From the Start Menu choose
+**Update FFmpeg** to get an updated binary later. Portable builds bundle FFmpeg.
+Keep Jellyfin's **Allow stream sharing** enabled if switching it off causes a
+playback error. A fast AussieTV redirect does not mean Jellyfin Web can
+immediately display its first picture; client probing, buffering, and HLS
+remuxing happen downstream.
 
-### Validation status
+## Discovery limitations
 
-- Go unit tests cover authentication, guide/channel ID matching, XML escaping, UTC timestamps, inaccessible channels, redirects, and network endpoint isolation.
-- Windows cross-build and Linux build work. A synthetic localhost feed health request was exercised.
-- Docker image builds and live Jellyfin playback have **not** been tested in this development environment. Host-level port firewall and local network access must be configured by the operator.
-- Future enhancement: optionally proxy authenticated compatible HLS segments where permitted and justified, implement a proper multi-user LAN TV UI, evaluate HDHomeRun discovery only if native M3U/XMLTV proves insufficient.
+AussieTV may optionally advertise a **virtual HDHomeRun** tuner via UDP
+65001, plus TCP 80 on the LAN IP if available. Some Jellyfin versions and
+Docker network layouts cannot detect or use it. This does not prove a feed
+failure. For reliability, retain the M3U/XMLTV tuner and disable discovery.
+If testing discovery, keep firewalls restricted to Private/LocalSubnet and
+prefer Docker host networking on the Jellyfin side so broadcast traffic
+reaches the server. HDHomeRun-mode HTTP can expose an unauthenticated tuner
+lineup on the LAN, so do not expose these ports beyond trusted clients.
+
+## Diagnostics and evidence
+
+AussieTV Settings shows whether ports actually bound, HDHomeRun probe/reply
+counts, FFmpeg health and stream timing categories. Never share the raw
+`?key=...` URLs, signed HLS URLs, or unredacted server logs. Media requests
+that finish with HTTP 499 may simply be FFmpeg cancelling unneeded segments;
+502 indicates a relay failure. Tests based on synthetic sources do **not**
+prove live SBS audio or Jellyfin stability.
+
+Known problems: [BETA-KNOWN-ISSUES.md](BETA-KNOWN-ISSUES.md). See
+[JELLYFIN-BENCHMARK.md](JELLYFIN-BENCHMARK.md) for a repeatable Web benchmark.
