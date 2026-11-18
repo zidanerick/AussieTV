@@ -1,135 +1,120 @@
-# AussieTV project continuity / future-chat handoff
+> **Version note (v0.1.0-beta.1):** This document may describe pre-beta v1.x/v2.x prototypes. Current Windows beta status and support boundaries are in [README](../README.md) and [Known issues](BETA-KNOWN-ISSUES.md).
 
-**Last documented:** 18 November 2026  
-**Current code:** v1.8.0 on `main` (PR #13 merged; `6e3a900ccd9dcf5f1fdb82c7e9479dd742334029`)  
-**Repository:** https://github.com/zidanerick/AussieTV
+# AussieTV project continuity
 
-## User goal
+**Latest implementation:** v1.7.0, 16 November 2026. GitHub: https://github.com/zidanerick/AussieTV
 
-Create a simple, TV-like Windows interface for Australia's main free-to-air broadcasters (ABC, SBS, Seven, Nine, 10), with a real programme guide, channel logos and relevant artwork. The user is in Victoria; Melbourne channel selection is currently the default. A possible later goal is running similar frontend functionality on Raspberry Pi 3B.
+AussieTV is a Go Windows console app serving an embedded HTML/CSS/JS TV guide on a localhost web port, normally `127.0.0.1:45781`, with a browser app window and fallback address. It selects Australian live streams from third-party TV metadata and exposes a bounded HLS proxy. The user confirmed a previous Windows version worked, but actual broadcaster playback tests are not systematic.
 
-## Implemented
+## v1.7 changes
 
-- Portable Windows x64 Go application serving embedded HTML/CSS/JS on localhost.
-- Reads regional channel listing and EPG data from https://i.mjh.nz/au/ (third-party service).
-- HLS video via browser/HLS.js where playable; broadcaster official live-TV pages as fallbacks.
-- Main broadcaster filtering, selected secondary channels and full-screen playback.
-- v1.1: visible launcher `RUN-AussieTV.cmd`, browser start, log at `%LOCALAPPDATA%\AussieTV\startup.log` and fallback local URL.
-- v1.2: guide-provided channel logos, brand-coloured fallbacks, optional TVmaze show artwork for exact title matches.
-- v1.3: persistent browser-local favourite channels, Favourites filter, and visible star for saved channels.
-- v1.3: EPG directional focus navigation, correct Enter activation on actual buttons, focus retained when guide refreshes, and single redraw per minute.
-- v1.3: startup timeout for HLS playback and one maximum HLS media recovery.
-- v1.3: signed HLS segment/variant URL rewriting, strict channel-root validation, outbound DNS/public IP and redirect guards, local Host/Origin checks.
+- `static/remote.js` handles TV remote input throughout the web UI, including spatial D-pad navigation, OK, Back, browser legacy key codes, numeric tuning, channel step and focus management.
+- `static/index.html` adds high-contrast focus, remote help, Play/Pause/Mute and a separately loaded remote module. Original player/guide functionality remains.
+- `main.go` allowlists `/remote.js` as an embedded asset, bumps version and preserves localhost service protections.
+- `logo.go` and `logo_test.go` from the preceding unpublished all-channel logo fix add real guide-logo proxy with SSL and DNS safeguards, short-lived image caching and contrast-aware rendering. The service remains restricted to curated channel IDs.
+- `tests/remote_keys.test.cjs` (Node only) and `tests/remote_browser_smoke.py` (optional Playwright/Chromium mock UI) cover core remote inputs.
+- `docs/REMOTE.md` and `docs/INTEGRATIONS.md` document compatibility and the Docker/Jellyfin plan.
 
-- v1.4: original AussieTV logo and wordmark, favicons and multi-size ICO; reproducible Go icon generator and brand asset HTTP tests. The existing guide/player behaviour is unchanged.
-- Original branding source: `static/app-icon.svg`, `static/aussietv-logo.svg`, `tools/iconbuilder/main.go` and `assets/BRANDING.md`.
-- Run `go run ./tools/iconbuilder` before building to produce generated PNG and ICO files. The GitHub Actions build runs this automatically.
-- Windows ZIP contains `assets/AussieTV.ico` for shortcut customization. The original v1.4 icon was supplied separately; v1.5 now also embeds it in the executable.
+## Evidence
 
-- v1.5: embeds seven icon sizes in the PE executable via `tools/iconbuilder/winresource.go`, generated `rsrc_windows_amd64.syso`. Prefers Edge/Chrome `--app` window, retains v1.1 shell/default browser fallback and supports `AUSSIE_TV_BROWSER_MODE=default`.
+Go tests and race detector passed on Linux; Node remote-key tests and in-memory Chromium guide/navigation tests passed; Windows amd64 cross-compile passed. Browser test uses fake schedules and does *not* validate live video, native Windows mouse/remote or Safari/Firefox/TV-browser behaviour.
 
-## Exact historical versions
+## Next tasks
 
-- v1.0: commit `681b9aa580f0ac5f2ff961f2804c654866631391` ; branch `versions/v1.0`
-- v1.1: commit `c78cc5a2a3674bedd0277dadbd9771b4fe5ad8e3` ; branch `versions/v1.1`
-- v1.2: commit `72bc93cb9d55aa4b2a7db9bc603df52c9cb3e1c9` ; branch `versions/v1.2`
-- v1.3: branch `versions/v1.3` stores the latest source checkpoint; see GitHub commit history for the exact version commit.
-- Later docs/automation commits on main are not themselves new user-facing product versions.
+1. Confirm UI navigation on the user's TV remote, determine model/transport (HDMI-CEC, Android TV, IR-USB, Bluetooth) if key events differ.
+2. Build a browser matrix for Edge, Firefox and Safari where hardware is available; validate HLS.js native playback, captions, actual streams and fullscreen limitations.
+3. Extract shared region/channel/EPG data API and stable IDs.
+4. Implement a separate authenticated network/server mode and Docker package; do *not* simply bind existing desktop API on `0.0.0.0` (quit, heartbeat and host/origin security must be redesigned).
+5. Expose M3U/XMLTV data for Jellyfin built-in Live TV; consider a plugin only for remaining features.
 
-## Build / test / launch
+## Resume in another chat
 
-```bash
-go run ./tools/iconbuilder
-go test ./...
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o AussieTV.exe .
-```
+Read `README.md`, `AGENTS.md`, `docs/REMOTE.md`, `docs/INTEGRATIONS.md`, GitHub open issues and the current branch head. Keep earlier snapshot branches unchanged. Do not claim successful remote input tests on hardware without an actual device test.
 
-Bundle `AussieTV.exe`, `RUN-AussieTV.cmd`, `README.txt` and `assets/AussieTV.ico`. GitHub Actions workflow `.github/workflows/windows-build.yml` builds and uploads this ZIP automatically. Local address defaults to http://127.0.0.1:45781.
+## v1.7.1 remote navigation repair (17 November 2026)
 
-## Verification state
-
-- v1.2 unit tests passed in Linux on 15 Nov 2026.
-- v1.3 Go unit tests and race detector passed in Linux on 15 Nov 2026, including signed URL, forged HLS and private-DNS tests.
-- v1.3 headless Chromium interaction checks passed using mocked channel data: 5 networks, favourite persistence serialization/filtering, guide arrow navigation, Enter activation, focus preservation. A screenshot was inspected in the development environment.
-- v1.3 local server responded HTTP 200; invalid Host requests returned HTTP 403.
-- v1.3 Windows x64 cross-compilation passed in Linux.
-- Windows x64 executable cross-compilation passed, with PE console subsystem.
-- Source and local HTTP endpoints were checked in earlier work.
-- User previously confirmed that the v1.1 Windows app launched successfully.
-- **Not proven**: live Australian stream playback, Windows native startup for v1.3, sustained stream reliability, artwork matching for every programme, or Australian geolocation behaviour. Browser interaction tests used mock EPG data and did not test video. Do not claim those tests passed.
-
-- v1.5 local verification: Go tests passed, Windows amd64 executable cross-built, and Windows PE .rsrc structure inspected with seven icon sizes. The native Windows app-mode/window/taskbar behaviour is not independently tested on Windows; the browser still owns that window.
-
-## Technical risks / boundaries
-
-1. Third-party stream index is not guaranteed to stay online and does not imply rights to redistribute channels.
-2. Some streams need DRM, tokens, login or location checks and cannot simply be played in a generic HLS player. Use official broadcaster links as fallback. Do not add bypasses.
-3. Artwork from TVmaze can misidentify names; keep conservative title matching and visible attribution.
-4. Local streaming proxy makes outbound requests. Preserve SSRF restrictions and loopback-only bind; add regression tests for redirects/host validation if modifying it.
-5. Latest code is a proof-of-concept, not a digitally signed production distribution.
-6. Melbourne guide may not match regional Gippsland schedules.
-
-## Next useful improvements
-
-- Verify a native Windows build from the GitHub Actions artifact and check actual stream-by-stream playback.
-- Log which channels fail and why (DRM, expired URL, CORS, region, missing EPG), without recording secrets.
-- Improve EPG further for TV remotes, including test coverage and regional channel guides. Keyboard navigation and favourites first landed in v1.3.
-- Evaluate artwork caching and now/next improvements without unnecessary API traffic.
-- Investigate official/legal streaming integrations and proper regional selection.
-- Add release tags and release attachments after a real Windows smoke test.
-
-## How to continue in a new chat
-
-Say: "Continue development of https://github.com/zidanerick/AussieTV. Read README.md, AGENTS.md, docs/CONTINUITY.md and current GitHub issues. Inspect the actual main branch before changing code. Work from the current version, preserve historical branches, run tests, and update the handoff document."
-
-If a change is made, update this document with: exact commit SHA, affected files, tests executed, Windows device evidence (or an explicit gap), regressions, and the next task. Last v1.3 files: `main.go`, `main_test.go`, `static/index.html`, `README.txt`, `README.md`, `CHANGELOG.md`, `AGENTS.md` and this continuity file.
-
-## v1.4 validation and next step
-- Go icon generation, Go tests, Windows cross-compilation and local asset HTTP smoke test passed on Linux on 16 Nov 2026.
-- PNG and ICO output include transparent imagery; the ICO was structurally inspected with Pillow for all seven icon resolutions.
-- GitHub Actions Windows build and native user-facing UI are separate validation gates. Live channel playback was not changed by this branding update.
-- Further improvement: embed the Windows icon into PE resources if wanted, and track channel-by-channel playback evidence.
-
-## v1.5 handoff
-
-Before each Windows build run `go run ./tools/iconbuilder`, which produces `rsrc_windows_amd64.syso` (ignored by Git). Then run `go test ./...` and compile for Windows amd64. Keep the existing console launcher and default browser fallback. Windows EXE icon is verified by PE structure inspection, not native Windows Explorer UI. Do not claim a separate native window, as Edge/Chrome still provides the app window.
-
-## v1.5.1 channel logo repair (16 November 2026)
-
-- Six locally bundled fallback channel identifiers at `static/channel-logo-*.svg`, served by the existing allowlisted asset handler.
-- Mapping and browser image-error recovery in `static/index.html`: ABC NEWS, SBS, SBS2, SBS World Movies, SBS Food and NITV. The original feed URL remains the first choice.
-- Tests: local Go unit tests and race detector passed; Windows x64 cross-compiled; SVG syntax and JS syntax validated. Headless browser navigation blocked by the test environment; no native Windows verification yet. No change to HLS proxy or playback.
-- Next: confirm logo fallback for each named channel on Windows, particularly when upstream artwork URLs fail.
-
-## v1.6: Captions and AussieTV Text (16 November 2026)
-
-- New caption track selector and C shortcut in `static/index.html`; HLS subtitle renditions selected through Hls.subtitleTrack and in-band CEA caption tracks through HTMLMediaElement.textTracks.
-- Caption selector is disabled when the current IPTV source lacks accessible tracks. Preference for language saved in localStorage. No subtitles are generated; playback on broadcaster's official site remains fallback.
-- New Teletext-inspired information overlay uses the EPG: 100 index, 200 now/next, 300 channels, 400 help. It is NOT decoding old Austext or DVB teletext packets. T opens/closes, Escape closes.
-- Existing stream proxy and safety checks unchanged; only front-end plus version and docs changed.
-- Local: Go tests and race detector pass; JS syntax check passes; browser UI smoke using mocked EPG and injected native caption track passes. Windows x64 cross-compilation passed. No native Windows or real broadcast caption testing yet.
-- Next: test ABC News, ABC TV, SBS and commercial network caption selector on actual Windows streams; capture a per-channel caption capability table. Determine if DVB-T support is needed for any original broadcast-only captions.
-
-## v1.7 remote-control integration (16 November 2026)
-
-- Added `static/remote.js` (whole-interface D-pad/OK/Back, numeric tune, CH+/-, guide, filters and overlays), high-contrast focus and explicit player play/mute buttons.
-- The browser UI remains a client of same-origin relative API URLs, facilitating future host/service separation. Current process still uses localhost-only binding, auto quit/heartbeat and desktop browser launch, **not safe to expose as-is to the LAN**.
-- Integrated prior all-channel logo proxy work via `logo.go` and `logo_test.go`, including DNS restrictions and bounded image cache. No HLS proxy logic was changed.
-- Automated checks: `go test -race ./...`, `go vet ./...`, `node --test tests/remote_keys.test.cjs`, `python tests/remote_browser_smoke.py` with mocked TV schedules, and Windows x64 Go build. All passed locally; Firefox/Safari, real streams and TV hardware not verified.
-- Roadmap in `docs/REMOTE.md` and `docs/INTEGRATIONS.md`. For Jellyfin, validate standard M3U+XMLTV Live TV integration before building a new plugin.
-
-## v1.7.1 remote-control navigation correction (17 November 2026)
-
-- **Reason:** v1.7 used full-page nearest-element navigation when a guide move hit its boundary; focus could jump diagonally into the player or other shows. Region and caption `<select>` elements used native arrows even during ordinary D-pad navigation, inadvertently changing settings.
-- **Implementation:** `static/remote.js` restricts horizontal moves to the same visible row and local control group. A guide boundary does not fall through to global navigation. Region and CC selects have explicit OK-to-edit, up/down preview, OK-to-commit, Back/Escape cancel. `static/index.html` adds edit-state highlighting and UI help.
-- **Tests:** Go unit and race, Node remote unit, mocked Chromium at 1280x800 and 768x800, and Windows x64 cross-build passed locally. No real device or broadcaster playback test performed.
-- **Future:** Docker/Jellyfin server-mode work remains separate and must retain these remote-navigation semantics.
+- Mainline bug: v1.7 guide boundary key presses fell through to full-page nearest-element matching, allowing diagonals to player/now-playing controls. Region and CC `<select>` elements always received native arrows, changing selections unintentionally and effectively trapping D-pad focus.
+- Fix: in `static/remote.js` restrict horizontal direction to same-row candidates and relevant control groups; guide arrow navigation never falls through at its boundaries. Region/caption selects only edit after OK; Up/Down previews; OK fires change on commit; Back/Escape cancels. Edited select uses a distinctive focus outline.
+- Tests: Go unit and race tests; Node key/spatial unit tests; mocked Chromium interactions at 1280x800 and 768x800, including no accidental region changes, commit/cancel, guide edge and player control group; Windows x64 cross-build. Physical TV remote, Safari, Firefox, native Windows player and streams are not validated.
+- For Docker: preserve these remote input semantics and keep auth/server-mode changes separate from the desktop fix.
 
 
-## v1.8.0 (18 November 2026): deterministic remote exits and Jellyfin
+## v1.8.0 (18 November 2026): remote exits and Jellyfin feed
 
-- Retain desktop loopback UI and launcher. D-pad navigation now has explicit cross-section routes between sidebar, player controls, now-playing actions, quick channels, guide actions, and the programme guide. Each row still uses program-aware movement. Browser tests verify escape routes, dropdown edit/cancel, playback controls and overlays without Escape-only traps.
-- A new **opt-in** Jellyfin feed listener serves only token-protected `/jellyfin/channels.m3u`, `/jellyfin/guide.xml`, `/jellyfin/stream/{id}` (redirect) and `/jellyfin/health`. No desktop APIs, HLS proxy, or unauthenticated UI are exposed on its port. `AUSSIETV_MODE=server` prevents desktop shutdown and heartbeat exit.
-- M3U tvg-id and XMLTV channel IDs match. Channels without valid public upstream links are excluded. Guide timestamps are UTC. Stream URLs redirect to upstream HLS sources: playback still depends on external stream restrictions.
-- New files: `jellyfin.go`, `jellyfin_test.go`, `Dockerfile`, `compose.yaml`, `docs/JELLYFIN.md`, `.github/workflows/docker-feed.yml`.
-- Evidence: local `go test -race ./...`, `node --test tests/remote_keys.test.cjs`, `python tests/remote_browser_smoke.py` (mock feed), Windows x64 Go build, and local feed isolation/authentication HTTP checks passed. Real Android/TV remote and Jellyfin playback, and Docker on Unraid, remain unverified.
+- The main Windows app retains localhost-only UI and desktop launcher.
+- Remote navigation adds explicit section transitions when a spatial move hits a boundary. Guide arrow keys still move through logical channel/programme cells first. New browser smoke tests exercise escaping guide and control-group edges.
+- The separate opt-in Jellyfin feed listener requires a long token and explicit bind/base URL. Only M3U/XMLTV, redirect and health endpoints are exposed. Server mode disables the desktop quit route and browser heartbeat.
+- New files: `jellyfin.go`, `jellyfin_test.go`, `docs/JELLYFIN.md`, `Dockerfile`, `compose.yaml`, `.dockerignore`.
+- Tests: `go test -race ./...`, `node --test tests/remote_keys.test.cjs`, `python tests/remote_browser_smoke.py`, local Windows cross-compilation, and local server health checks.
+- Not yet verified: native remote hardware, Jellyfin live-stream playback, actual Docker build in a Docker runtime, multi-client authenticated browser UI.
+
+## v1.9.0 (18 November 2026)
+
+- Source-of-truth goal: preserve the Windows desktop build and support a notification area process with no console, separate Settings GUI, persistent Jellyfin feed settings and optional LAN HDHomeRun discovery.
+- Files: `settings.go`, `settings_test.go`, `tray_windows.go`, `tray_other.go`, `static/settings.html`, `hdhr.go`, `hdhr_test.go`, updated `jellyfin.go`, `main.go`, TV quit button and Windows CI.
+- HTTP `discover.json`, `lineup.json`, `lineup_status.json`, `auto/vNUMBER` enabled only when explicitly opted into LAN discovery, private-IP gated, no M3U key on these HDHR-specific endpoints. M3U/XMLTV still require secret. UDP broadcast 65001 responds to valid CRC-checked HDHomeRun discovery requests.
+- Tests: Go/race, Windows GUI-subsystem cross-build, Node remote tests, synthetic Linux server HTTP 200/401 and live UDP discovery reply. **No actual native Windows tray click test and no real Jellyfin tuner import/playback test.**
+- Security: no browser quit in tray mode; settings API same-origin and anti-CSRF; no router port forwarding. Keep LAN firewall restriction (TCP 45782 and optionally UDP 65001).
+- Known limitation: native HDHomeRun-compatible clients may require HTTP port 80 or MPEG-TS stream delivery; auto-discovery and HDHR playback are experimental. M3U/XMLTV recommended.
+
+## v2.0.0-preview (18 November 2026): Teletext and startup
+
+The v1.9 silent launch was a Go HTTP mux route-pattern panic: `GET /` conflicts with methodless `/api/settings` in Go 1.22+. Fixed by method-specific Settings handlers. Rebuilt console diagnostic EXE accompanies the GUI app; Jellyfin port or tray failures no longer prevent TV startup. **New tests include an actual Linux startup with port 45782 held by another process.**
+
+`teletext/` is an independent 40x24 page model with TTI exporter, tests and optional FFmpeg MPEG-TS in-vision channel. Default editable config in `config/teletext.json`; Windows picks up `teletext.json` next to its executable. Pages are served on the local UI and (authenticated) Jellyfin feed. See `docs/TELETEXT.md`. GUI full viewer is at `/teletext/`, export `/teletext/export.zip`. `AUSSIETV_TELETEXT_VIDEO=1` with FFmpeg makes the Jellyfin M3U/XMLTV virtual channel 995 available.
+
+IMPORTANT: There is no actual PAL/VBI modulator here; use VBIT2 and hardware to transmit Teletext for an analogue TV. Native VBIT2 decoding, physical TV hardware, live BOM/weather sources and Jellyfin stream playback still require validation. Do not claim captions 800/801 are real or synced. The browser and video views do not convey a DVB Teletext auxiliary stream.
+
+## v2.0.1 preview (18 November 2026): Settings, browser, and firewall
+
+- Based on `AussieTV-Source-v2.0-Teletext-PREVIEW.zip`, not GitHub `main`
+  (GitHub was last at v1.8; the v1.9+ sources have not yet been merged).
+- Reproduced Settings failure: extraneous closing brace following `save()`
+  caused a global syntax error, preventing `load()` from ever running.
+- Corrected Settings JS and added Node syntax/DOM/save regression test in CI.
+- Both tray Open and Settings launch through Windows ShellExecuteW's `open`
+  handler (system default browser). Removed forced Edge/Chrome logic.
+- On desktop Settings save, changes to LAN/HDHomeRun permissions prompt for
+  administrator approval in a short-lived helper process. The helper only
+  manages two app-owned inbound Windows Firewall rules, Private profile and
+  LocalSubnet remote scope, TCP 45782 and optional UDP 65001. Local-only
+  usage makes no firewall changes. A cancelled UAC prompt produces a visible
+  warning without re-enabling a disabled feed; Repair allows retrying.
+- Test evidence: local Go tests/race detector, Node remote/settings tests,
+  Windows GUI and diagnostic cross-compilation, HTTP/Settings verification.
+  Native UAC and default-browser behaviour require an actual Windows PC test.
+- Continue Teletext and Jellyfin work from this preview source, not old main.
+
+## v2.0.2 Preview, 18 November 2026: Jellyfin tuning latency and HDHR discovery
+
+- Code based on the unmerged v2.0.1 Teletext/Settings preview, NOT repository main (which remains v1.8).
+- In `jellyfin.go`, return immediate HTTP 200 HLS MIME response for HEAD and suffix the M3U HLS links `.m3u8`; GET still uses the original upstream redirect.
+- In `main.go`, retain expired cached channel data immediately, refresh in the background with a 1-minute attempt throttle. Does not avoid initial cold fetch.
+- In `hdhr.go`, correct virtual DeviceID checksum and validate a private IPv4 host for optional discovery HTTP port 80.
+- In `settings.go`, add a second LAN-only listener on TCP 80 for HDHomeRun discovery when enabled; fail softly if unavailable, maintaining authenticated M3U on TCP 45782. Settings status exposes the warning.
+- In `firewall_windows.go`, add Private/LocalSubnet TCP80 rule on discovery and remove on disable. Existing installations must use Repair firewall access.
+- Tests: `go test ./...`, `go test -race ./...`, Node remote/settings tests and Windows GUI/console crossbuild passed locally. Synthetic tests do not establish real Jellyfin playback or physical network discovery.
+- Next: user-run Windows test with actual Jellyfin and its UDP broadcast path, confirm no 30+ second tuning when cache refresh occurs, monitor Live TV HEAD and ffmpeg logging.
+
+## v2.0.3 Preview, 18 November 2026: Jellyfin relay and discovery troubleshooting
+
+- Developed from the unmerged v2.0.2 Windows/Teletext preview. GitHub main remains on v1.8 until this preview is separately reviewed and merged.
+- Added `jellyfin_relay.go` and tests; direct 307 redirects remain the default. Optional HLS relay mode is selectable in Settings or via `AUSSIETV_JELLYFIN_STREAM_MODE=relay` for server mode. Existing M3U URLs still work.
+- New authenticated `/jellyfin/diagnostics` endpoint reports timings and HDHomeRun UDP probe/reply/HTTP counts without exposing stream URLs or keys. Settings includes a refresh button for these counters.
+- Tests verify playlist rewriting, segment passthrough, denied private/forged URLs, auth, actual localhost UDP discovery response, Go race checks, JS Settings/remote tests, Windows GUI/diagnostic cross-build. Not a claim of real Jellyfin detection or live broadcaster timing improvements.
+- User confirmed manual M3U works, autodetection does not, and disabling Jellyfin **Allow stream sharing** breaks playback. Recommend keeping stream sharing enabled and using the M3U tuner while debugging UDP reachability.
+- Next: compare Jellyfin startup latency in redirect versus relay, and inspect whether UDP probes are observed when Jellyfin searches. If no UDP received check Docker host networking/subnet/firewall; if probes received but no detection, investigate remaining HDHomeRun protocol requirements.
+
+## v2.0.4 (18 November 2026): Jellyfin diagnostics and discovery partial bind
+
+- Based on v2.0.3 preview, not GitHub main (older v1.8).
+- Direct stream mode previously emitted `events:[]` with `streamMode:""`; now records 200 HEAD and 307 redirect events and returns effective mode. This does not measure the broadcaster/Jellyfin time after redirect.
+- HDHomeRun UDP listener can now operate when TCP 80 is unavailable; authenticated `/jellyfin/diagnostics` reports both bind states separately. Listening does not imply Jellyfin receives UDP or accepts the tuner.
+- Keep sharing enabled in Jellyfin for the known working tuner. Measure actual 8-9 s behaviour before further buffering changes.
+
+## v2.0.5 isolated artwork/MPEG-TS experiment (18 November 2026)
+Source is based on v2.0.4-preview, not the repository's old main (v1.8). No production changes. See `docs/JELLYFIN-ARTWORK-TS.md` and `docs/JELLYFIN-BENCHMARK.md`. XMLTV programme art uses existing TVmaze cache with bounded background workers, and MPEG-TS runs copy-only FFmpeg via authenticated localhost HLS. Default redirect mode unchanged. Offline integration covers H.264/AAC, auth, cancellation and PTS; live Jellyfin Web timings and programme Primary-image imports are **not yet verified**. Do not merge the preview into main or ask users to alter their working tuner before device validation.
+
+## v2.0.9 preview (18 Nov 2026)
+
+Branch release remains standalone; GitHub `main` remains older. Experimentally mapped audio was optional in v2.0.8, allowing FFmpeg to return a video-only MPEG-TS and a misleading 200. `jellyfin_mpegts.go` now requires first audio stream, uses bounded larger probes, and verifies PAT/PMT and elementary stream packet presence with `ts_audio_probe.go`. Go tests verify no-audio upstream returns 502 and A/V fixtures remain valid. No direct Jellyfin playback confirmation is claimed.

@@ -12,7 +12,7 @@ import (
 
 func TestCuratedChannelMapping(t *testing.T) {
 	entries := map[string]Entry{
-		"mjh-abc-vic":       {Name: "ABC TV", Network: "ABC", Master: "https://c.mjh.nz/abc-vic.m3u8", Programs: [][]any{{float64(2000), "Second show"}, {float64(1000), "First show"}}},
+		"mjh-abc-vic":       {Name: "ABC TV", Network: "ABC", Master: "https://c.mjh.nz/abc-vic.m3u8", Headers: map[string]string{"user-agent": "otg/1.5.1"}, Programs: [][]any{{float64(2000), "Second show"}, {float64(1000), "First show"}}},
 		"mjh-channel-9-vic": {Name: "Channel 9", Network: "Nine", Master: "https://i.mjh.nz/.r/channel-9-vic.m3u8"},
 		"mjh-other":         {Name: "Sports Channel", Network: "Another Network", Master: "https://test.example/live.m3u8"},
 	}
@@ -96,22 +96,29 @@ func TestArtworkExactMatching(t *testing.T) {
 	old := artworkClient
 	defer func() { artworkClient = old }()
 	artworkClient = &http.Client{Transport: artworkTransport(func(req *http.Request) (*http.Response, error) {
-		if req.URL.Host != "api.tvmaze.com" || req.URL.Query().Get("q") != "Bluey" {
+		if req.URL.Host != "api.tvmaze.com" || req.URL.Path != "/search/shows" || req.URL.Query().Get("q") != "Bluey" {
 			t.Errorf("unexpected lookup: %s", req.URL)
 		}
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"name":"Bluey","url":"https://www.tvmaze.com/shows/42692/bluey","image":{"medium":"https://static.tvmaze.com/uploads/images/medium_portrait/1/bluey.jpg"}}`)), Header: make(http.Header), Request: req}, nil
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`[{"show":{"name":"Bluey","url":"https://www.tvmaze.com/shows/42692/bluey","image":{"medium":"https://static.tvmaze.com/uploads/images/medium_portrait/1/bluey.jpg"}}}]`)), Header: make(http.Header), Request: req}, nil
 	})}
 	result := lookupArtwork("Bluey")
 	if result.Poster == "" || result.Credit != "TVmaze" || result.Page == "" {
 		t.Fatalf("expected attributed image; got %+v", result)
 	}
 	artworkClient = &http.Client{Transport: artworkTransport(func(req *http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"name":"Bluey: Extra Adventures","image":{"medium":"https://static.tvmaze.com/uploads/images/medium_portrait/1/bluey.jpg"}}`)), Header: make(http.Header), Request: req}, nil
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`[{"show":{"name":"Bluey: Extra Adventures","image":{"medium":"https://static.tvmaze.com/uploads/images/medium_portrait/1/bluey.jpg"}}}]`)), Header: make(http.Header), Request: req}, nil
 	})}
 	result = lookupArtwork("Bluey")
 	if result.Poster != "" {
 		t.Fatalf("accepted the wrong programme: %+v", result)
 	}
+	artworkClient = &http.Client{Transport: artworkTransport(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`[{"show":{"name":"Bluey","image":{"medium":"https://static.tvmaze.com/uploads/images/medium_portrait/1/a.jpg"}}},{"show":{"name":"Bluey","image":{"medium":"https://static.tvmaze.com/uploads/images/medium_portrait/2/b.jpg"}}}]`)), Header: make(http.Header), Request: req}, nil
+	})}
+	if got := lookupArtwork("Bluey"); got.Poster != "" {
+		t.Fatalf("ambiguous exact match must be rejected: %+v", got)
+	}
+
 }
 
 func TestStreamProxyOnlyAllowsListedRootOrSignedManifestResources(t *testing.T) {
@@ -170,7 +177,7 @@ func TestSafeDialRejectsPrivateHostBeforeConnecting(t *testing.T) {
 func TestAppBrandingRoutes(t *testing.T) {
 	cases := map[string]string{
 		"/": "text/html", "/app-icon.svg": "image/svg+xml", "/aussietv-logo.svg": "image/svg+xml", "/favicon-32.png": "image/png", "/favicon-192.png": "image/png", "/favicon.ico": "image/x-icon", "/site.webmanifest": "application/manifest+json",
-		"/remote.js": "application/javascript",
+		"/remote.js":                 "application/javascript",
 		"/channel-logo-abc-news.svg": "image/svg+xml", "/channel-logo-sbs.svg": "image/svg+xml", "/channel-logo-sbs2.svg": "image/svg+xml",
 		"/channel-logo-sbs-world-movies.svg": "image/svg+xml", "/channel-logo-sbs-food.svg": "image/svg+xml", "/channel-logo-nitv.svg": "image/svg+xml",
 	}
@@ -196,17 +203,9 @@ func TestAppBrandingRoutes(t *testing.T) {
 	}
 }
 
-func TestWindowsBrowserCandidatesHaveBrowserExecutables(t *testing.T) {
-	t.Setenv("ProgramFiles(x86)", `C:\Program Files (x86)`)
-	t.Setenv("ProgramFiles", `C:\Program Files`)
-	t.Setenv("LOCALAPPDATA", `C:\Users\Test\AppData\Local`)
-	candidates := windowsBrowserCandidates()
-	if len(candidates) != 6 {
-		t.Fatalf("want 6 Edge/Chrome locations, got %d: %v", len(candidates), candidates)
-	}
-	for _, c := range candidates {
-		if !strings.HasSuffix(strings.ToLower(c), "msedge.exe") && !strings.HasSuffix(strings.ToLower(c), "chrome.exe") {
-			t.Fatalf("unexpected browser executable: %s", c)
-		}
+func TestOpenBrowserCanBeDisabledForTests(t *testing.T) {
+	t.Setenv("AUSSIE_TV_NO_BROWSER", "1")
+	if err := openBrowser("http://127.0.0.1:45781/"); err != nil {
+		t.Fatal(err)
 	}
 }

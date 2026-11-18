@@ -2,11 +2,9 @@ name: Windows build and tests
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,42 +16,43 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
       - name: Set up Node.js for remote navigation tests
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
       - name: Test remote-control key mappings and spatial navigation
-        run: node --test tests/remote_keys.test.cjs
-
+        run: node --test tests/remote_keys.test.cjs tests/settings_page.test.cjs
       - name: Generate icons and embedded Windows resource
         run: go run ./tools/iconbuilder
-
       - name: Run unit tests
         run: go test ./... -count=1 -v
-
-      - name: Build Windows x64 executable
+      - name: Build Windows GUI x64 executable
         shell: pwsh
         run: |
           $env:GOOS = 'windows'
           $env:GOARCH = 'amd64'
           $env:CGO_ENABLED = '0'
-          go build -trimpath -ldflags="-s -w" -o AussieTV.exe .
+          go build -trimpath -ldflags="-s -w -H=windowsgui" -o AussieTV.exe .
           if ($LASTEXITCODE -ne 0) { throw "go build failed" }
-
+      - name: Build diagnostic console executable
+        shell: pwsh
+        run: |
+          $env:GOOS = 'windows'
+          $env:GOARCH = 'amd64'
+          $env:CGO_ENABLED = '0'
+          go build -trimpath -ldflags="-s -w" -o AussieTV-Diagnostics.exe .
+          if ($LASTEXITCODE -ne 0) { throw "diagnostic build failed" }
       - name: Package portable app
         shell: pwsh
         run: |
           Copy-Item assets/AussieTV.ico ./AussieTV.ico
-          Compress-Archive -Path AussieTV.exe,RUN-AussieTV.cmd,README.txt,AussieTV.ico -DestinationPath AussieTV-Windows.zip -Force
+          Copy-Item config/teletext.json ./teletext.json
+          Compress-Archive -Path AussieTV.exe,AussieTV-Diagnostics.exe,RUN-AussieTV.cmd,RUN-Diagnostics.cmd,README.txt,AussieTV.ico,teletext.json -DestinationPath AussieTV-Windows.zip -Force
           Get-FileHash AussieTV-Windows.zip -Algorithm SHA256 | Format-List
-
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:

@@ -1,0 +1,36 @@
+{
+  "service": "AUSSIE TEXT",
+  "region": "Melbourne",
+  "index_refresh_seconds": 30,
+  "data_refresh_seconds": 300,
+  "sections": [
+    {"start": 101, "end": 103, "title": "SERVICE INFORMATION", "kind": "notices", "live": true},
+    {"start": 104, "end": 119, "title": "NEWS", "kind": "news", "live": true},
+    {"start": 120, "end": 139, "title": "BOM WEATHER", "kind": "weather", "live": true},
+    {"start": 140, "end": 159, "title": "RACING AND SPORT", "kind": "results", "live": true},
+    {"start": 160, "end": 179, "title": "GENERAL INTEREST", "kind": "general", "live": true},
+    {"start": 180, "end": 199, "title": "TV SCHEDULE", "kind": "schedule", "live": true},
+    {"start": 200, "end": 200, "title": "SELF DIAGNOSTIC", "kind": "diagnostic", "live": true},
+    {"start": 201, "end": 299, "title": "EXPANSION", "kind": "reserved", "live": false},
+    {"start": 300, "end": 399, "title": "SBS SCHEDULE", "kind": "schedule_sbs", "live": true},
+    {"start": 400, "end": 499, "title": "SEVEN SCHEDULE", "kind": "schedule_seven", "live": true},
+    {"start": 800, "end": 801, "title": "SUPERTEXT CAPTIONS", "kind": "captions", "live": false},
+    {"start": 900, "end": 999, "title": "ADMINISTRATIVE", "kind": "admin", "live": false}
+  ],
+  "pages": [
+    {"number": 101, "title": "SERVICE NOTICES", "lines": ["AussieTV Teletext prototype", "For personal non-commercial testing."]},
+    {"number": 102, "title": "VERSION INFO", "lines": ["AussieTV TEXT experimental service", "TTI export compatible with VBIT2."]},
+    {"number": 103, "title": "MAINTENANCE", "lines": ["No scheduled maintenance notices."]},
+    {"number": 160, "title": "GENERAL INTEREST", "lines": ["Community content can go here.", "Edit config/teletext.json to customise."]}
+  ],
+  "weather": [
+    {"page": 120, "city": "Melbourne", "observation_url": "https://www.bom.gov.au/fwo/IDV60901/IDV60901.95936.json"},
+    {"page": 121, "city": "Sydney", "observation_url": "https://www.bom.gov.au/fwo/IDN60901/IDN60901.94768.json"},
+    {"page": 122, "city": "Brisbane", "observation_url": "https://www.bom.gov.au/fwo/IDQ60901/IDQ60901.94578.json"},
+    {"page": 123, "city": "Adelaide", "observation_url": ""},
+    {"page": 124, "city": "Perth", "observation_url": ""},
+    {"page": 125, "city": "Hobart", "observation_url": ""},
+    {"page": 126, "city": "Canberra", "observation_url": ""},
+    {"page": 127, "city": "Darwin", "observation_url": "https://www.bom.gov.au/fwo/IDD60901/IDD60901.94120.json"}
+  ]
+}

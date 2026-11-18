@@ -1,34 +1,40 @@
-# Development instructions for future AI-assisted sessions
+# AussieTV developer handoff
 
-1. Read `README.md`, `CHANGELOG.md`, `docs/CONTINUITY.md`, open GitHub issues and the current `main` tree before editing.
-2. Treat GitHub source as canonical. Do not reconstruct the code from conversation summaries when the repository is accessible.
-3. Preserve `versions/v1.0`, `versions/v1.1`, `versions/v1.2` and `versions/v1.3` snapshot branches and their original commits.
-4. Keep Windows 10/11 x64 compatibility; avoid dependencies or installers without a demonstrated need.
-5. Maintain the current working launcher and browser fallback. Do not hide all errors by default.
-6. Run `go test ./...` and build a Windows x64 executable for meaningful code changes.
-7. Clearly separate Linux automated tests, cross-compilation, native Windows launch tests and live Australian streaming tests.
-8. Never promise that third-party streams will work indefinitely; retain legal official-player fallbacks.
-9. Check URL validation, local binding, stream proxy and SSRF regression behaviour when changing network code.
-10. Update `CHANGELOG.md` and `docs/CONTINUITY.md` with each significant version, test evidence and open issues.
-11. Use small commits and pull requests where practical. Do not rewrite version-history branches or force-push main.
+**Current branch:** `main` targets **`v0.1.0-beta.1`**, the first early
+Windows-only beta. Previous `v1.*`/`v2.0.*` strings were pre-beta build labels.
+Do not revive them as release versions. Keep code and documentation versioned
+from `RELEASE_VERSION` and the `main.go` constant until these can be unified.
 
-12. Preserve v1.3 favourite/guide interactions, trusted stream-root policy, signed HLS subresources, redirect and DNS checks; exercise security regression tests before changing streaming code.
-13. Do not confuse headless Chromium with real Windows/browser playback validation. Track unverified streams in issue #1.
+## Scope
 
-14. For branding edits, keep SVG and generated PNG/ICO visuals consistent. Run `go run ./tools/iconbuilder` before build/test and preserve working broadcaster logos.
+- Supported beta target: Windows 10/11 x64, portable and Inno Setup installer.
+- Normal TV binds localhost `127.0.0.1:45781` (or a free loopback port).
+- Optional Jellyfin authenticated feed is TCP 45782, LAN gated via Settings;
+  HDHomeRun discovery is optional and experimental (UDP 65001 / TCP 80).
+- Direct Jellyfin HLS redirect is the default. FFmpeg MPEG-TS, Teletext video,
+  and HDHomeRun auto-discovery are experimental and can fail on real sources.
+- macOS, Linux and full Docker-served browser UI are **deferred**.
 
-14. Run `go run ./tools/iconbuilder` before building; it generates `rsrc_windows_amd64.syso` with the embedded EXE icon. Keep generator tests and inspect the icon resource on cross-built executables.
-15. The preferred branded app window is Edge/Chrome `--app`, not a native WebView. Preserve the default browser and console fallbacks, and avoid claiming a fixed browser taskbar identity.
+## Build / packaging
 
-14. Keep v1.5.1's bundled channel-logo fallbacks and their allowlisted SVG routes; retain the feed-provided logo as preferred artwork. Test the broken-remote-image path when changing logo rendering.
+- `go test ./... -count=1 && go vet ./...`
+- `go test -race ./...`
+- `node --test tests/remote_keys.test.cjs tests/settings_page.test.cjs`
+- `go run ./tools/iconbuilder` then cross-compile Windows GUI and diagnostic.
+- `.github/workflows/beta-release.yml` builds two assets and only creates a
+  prerelease after all Windows tests, FFmpeg checksum validation, and Inno
+  Setup compilation succeed. Do not overwrite an existing beta tag.
+- `installer/AussieTV.iss` includes optional FFmpeg download with a user-
+  selected folder and Start Menu update action. Script:
+  `tools/ffmpeg/fetch-windows.ps1` validates the SHA-256 and executable.
 
-15. For v1.6+ captions, never claim a live stream carries captions merely because the broadcaster captions its terrestrial broadcasts or official player. UI should only list actual tracks exposed in the current source and remain off by default. Preserve and test Hls.subtitleTrack/HTMLMediaElement.textTracks selection, and distinguish simulated browser tracks from real broadcasts.
-16. AussieTV Text 100/200/300/400 is a simulated locally-generated information overlay. Do not describe it as receiving Austext or legacy broadcast teletext packets. Preserve the original HTML/CSS interface and local fallback launch behavior.
+## Review policy
 
-17. v1.7 remote UI lives in `static/remote.js`. Preserve D-pad/OK/Back and help modal behavior, spatial focus, native select support, quick tile/guide focus on redraw and numeric entry. Run Node remote tests and browser mock integration for UI changes.
-18. A separate Docker server mode must change localhost-only lifecycle and authentication/Host/Origin assumptions before exposure; avoid trivial 0.0.0.0 binding. Jellyfin supports M3U/XMLTV without a plugin. See docs/INTEGRATIONS.md.
+Preserve Jellyfin feed authentication, SSRF/redirect rules, loopback host and
+origin checks, firewall Private-only rules, and FFmpeg cancellation. Never log
+signed broadcaster URLs or feed tokens. Keep new transport changes opt-in.
 
-15. In v1.7.1 and later, keep remote left/right within the visual control row, prevent guide-edge fallthrough, and require an explicit OK-to-edit mode for region/CC selectors with Back cancel and OK commit. Regression-test all four cases across at least two viewport widths; do not restore implicit select arrow changes.
-
-15. Preserve v1.8 D-pad section exit routes and test reachability across all named focus groups. Do not reintroduce guide edge or selector traps.
-16. Jellyfin integration is separate from the desktop loopback server. Do not expose the localhost player, quit, heartbeat, HLS or logo proxy on its LAN port. Keep read-only feed authentication and limit redirects to indexed channels. See `docs/JELLYFIN.md`.
+Use `docs/BETA-KNOWN-ISSUES.md` for unresolved concerns, and
+`docs/DEVELOPMENT-HISTORY.md` for old snapshots. The README should describe
+only active beta functionality. **Do not delete historical branches or releases
+without an explicit retention decision.**

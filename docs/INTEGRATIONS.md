@@ -1,3 +1,5 @@
+> **Version note (v0.1.0-beta.1):** This document may describe pre-beta v1.x/v2.x prototypes. Current Windows beta status and support boundaries are in [README](../README.md) and [Known issues](BETA-KNOWN-ISSUES.md).
+
 # AussieTV future hosting / Jellyfin integration plan
 
 This document is a plan, not a claim that the current Windows executable is a secure self-hosted server or Jellyfin plugin.

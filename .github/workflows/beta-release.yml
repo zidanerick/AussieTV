@@ -1,0 +1,140 @@
+name: "Beta release: Windows portable and setup wizard"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  beta-windows:
+    # Keep this workflow pinned to the first beta until its real Windows smoke
+    # checks are complete. A release will never overwrite an existing tag.
+    if: github.repository == 'zidanerick/AussieTV'
+    runs-on: windows-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check source version and tests
+        shell: pwsh
+        run: |
+          $tag = (Get-Content RELEASE_VERSION -Raw).Trim()
+          if ($tag -ne 'v0.1.0-beta.1') { throw "Unexpected release marker: $tag" }
+          go test ./... -count=1
+          if ($LASTEXITCODE -ne 0) { throw 'Go tests failed' }
+          node --test tests/remote_keys.test.cjs tests/settings_page.test.cjs tests/release_contract.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Browser tests failed' }
+          go vet ./...
+          if ($LASTEXITCODE -ne 0) { throw 'Go vet failed' }
+      - name: Build Windows 64-bit GUI and diagnostic executables
+        shell: pwsh
+        run: |
+          go run ./tools/iconbuilder
+          if ($LASTEXITCODE -ne 0) { throw 'Icon generation failed' }
+          $env:CGO_ENABLED = '0'
+          $env:GOOS = 'windows'
+          $env:GOARCH = 'amd64'
+          New-Item -ItemType Directory -Force dist/windows | Out-Null
+          go build -trimpath -ldflags='-s -w -H=windowsgui' -o dist/windows/AussieTV.exe .
+          if ($LASTEXITCODE -ne 0) { throw 'GUI build failed' }
+          go build -trimpath -ldflags='-s -w' -o dist/windows/AussieTV-Diagnostics.exe .
+          if ($LASTEXITCODE -ne 0) { throw 'Diagnostic build failed' }
+      - name: Download and verify licensed FFmpeg for portable edition
+        shell: pwsh
+        run: |
+          & ./tools/ffmpeg/fetch-windows.ps1 -Destination ./ffmpeg
+          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg download failed' }
+          & ./ffmpeg/ffmpeg.exe -version | Select-Object -First 1
+          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg did not run' }
+      - name: Build self-contained portable ZIP
+        shell: pwsh
+        run: |
+          $destination = 'dist/portable'
+          New-Item -ItemType Directory -Force "$destination/ffmpeg","$destination/tools/ffmpeg" | Out-Null
+          Copy-Item dist/windows/*.exe, README.txt, LICENSE, RUN-Diagnostics.cmd, RUN-AussieTV.cmd, SETUP-FFmpeg.cmd, UPDATE-FFmpeg.cmd "$destination/"
+          Copy-Item config/teletext.json "$destination/teletext.json"
+          Copy-Item assets/AussieTV.ico "$destination/AussieTV.ico"
+          Copy-Item ffmpeg/* "$destination/ffmpeg/" -Force
+          Copy-Item tools/ffmpeg/fetch-windows.ps1 "$destination/tools/ffmpeg/"
+          New-Item -ItemType Directory -Force dist/release | Out-Null
+          Compress-Archive -Path dist/portable/* -DestinationPath 'dist/release/AussieTV-Portable-v0.1.0-beta.1-win-x64.zip' -CompressionLevel Optimal -Force
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup install failed' }
+      - name: Compile Windows installer wizard
+        shell: pwsh
+        run: |
+          $compiler = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles}\Inno Setup 7\ISCC.exe",
+            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (!$compiler) { throw 'ISCC.exe not found' }
+          & $compiler 'installer/AussieTV.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compile failed' }
+          if (!(Test-Path 'dist/release/AussieTV-Setup-v0.1.0-beta.1-win-x64.exe')) { throw 'Installer EXE missing' }
+      - name: Smoke test packaging, scripts and checksums
+        shell: pwsh
+        run: |
+          $zip = 'dist/release/AussieTV-Portable-v0.1.0-beta.1-win-x64.zip'
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip))
+          try {
+            foreach ($name in @('AussieTV.exe','AussieTV-Diagnostics.exe','ffmpeg/ffmpeg.exe','UPDATE-FFmpeg.cmd','teletext.json')) {
+              if (!$archive.GetEntry($name)) { throw "Missing portable component: $name" }
+            }
+          } finally { $archive.Dispose() }
+          Get-FileHash dist/release/* -Algorithm SHA256 | Format-Table -AutoSize
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AussieTV-v0.1.0-beta.1-Windows-builds
+          path: dist/release/*
+          if-no-files-found: error
+          retention-days: 90
+
+  publish-beta:
+    name: Publish first beta only after successful Windows package builds
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: beta-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AussieTV-v0.1.0-beta.1-Windows-builds
+          path: dist/release
+      - name: Create immutable beta prerelease with both download choices
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$(tr -d '\r\n' < RELEASE_VERSION)"
+          test "$tag" = 'v0.1.0-beta.1'
+          if gh release view "$tag" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Release $tag already exists; leaving it unchanged"
+            exit 0
+          fi
+          ls -lh dist/release/*
+          gh release create "$tag" \
+            'dist/release/AussieTV-Portable-v0.1.0-beta.1-win-x64.zip' \
+            'dist/release/AussieTV-Setup-v0.1.0-beta.1-win-x64.exe' \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title 'AussieTV v0.1.0 beta 1 (Windows)' \
+            --notes-file RELEASE_NOTES.md --prerelease --latest=false

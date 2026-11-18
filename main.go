@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	"aussietv/teletext"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -29,11 +29,11 @@ import (
 	"time"
 )
 
-//go:embed static/*
+//go:embed static/* config/teletext.json
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
-const version = "1.8.0"
+const version = "0.1.0-beta.1"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -50,14 +50,15 @@ type Program struct {
 	Title string `json:"title"`
 }
 type Channel struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Number   string    `json:"number"`
-	Network  string    `json:"network"`
-	Logo     string    `json:"logo,omitempty"`
-	Stream   string    `json:"stream,omitempty"`
-	Official string    `json:"official"`
-	Programs []Program `json:"programs"`
+	ID       string            `json:"id"`
+	Name     string            `json:"name"`
+	Number   string            `json:"number"`
+	Network  string            `json:"network"`
+	Logo     string            `json:"logo,omitempty"`
+	Stream   string            `json:"stream,omitempty"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	Official string            `json:"official"`
+	Programs []Program         `json:"programs"`
 }
 type ChannelData struct {
 	Region   string    `json:"region"`
@@ -167,8 +168,12 @@ type cacheEntry struct {
 
 var cacheMu sync.Mutex
 var cache = map[string]cacheEntry{}
+var refreshRunning = map[string]bool{}
+var refreshAttempt = map[string]time.Time{}
+
 var lastPing atomic.Int64
 var hadPing atomic.Bool
+var trayReady atomic.Bool
 var server *http.Server
 var uriRegexp = regexp.MustCompile(`URI="([^"]+)"`)
 
@@ -219,12 +224,14 @@ func trustedTVmazeURL(raw string) bool {
 	return err == nil && u.Scheme == "https" && u.Hostname() == "www.tvmaze.com" && u.User == nil
 }
 func lookupArtwork(title string) Artwork {
+	// A single-search result can silently select one of several identically
+	// named shows. Search all candidates and only accept one exact match.
 	var empty Artwork
-	req, err := http.NewRequest("GET", "https://api.tvmaze.com/singlesearch/shows?q="+url.QueryEscape(title), nil)
+	req, err := http.NewRequest("GET", "https://api.tvmaze.com/search/shows?q="+url.QueryEscape(title), nil)
 	if err != nil {
 		return empty
 	}
-	req.Header.Set("User-Agent", "AussieTV/1.5 personal TV guide (TVmaze artwork attribution)")
+	req.Header.Set("User-Agent", "AussieTV/0.1.0-beta.1 (TVmaze artwork attribution)")
 	response, err := artworkClient.Do(req)
 	if err != nil {
 		log.Printf("programme art lookup: %v", err)
@@ -234,33 +241,157 @@ func lookupArtwork(title string) Artwork {
 	if response.StatusCode != http.StatusOK {
 		return empty
 	}
-	var show struct {
-		Name  string `json:"name"`
-		URL   string `json:"url"`
-		Image struct {
-			Medium   string `json:"medium"`
-			Original string `json:"original"`
-		} `json:"image"`
+	var candidates []struct {
+		Show struct {
+			Name  string `json:"name"`
+			URL   string `json:"url"`
+			Image struct {
+				Medium   string `json:"medium"`
+				Original string `json:"original"`
+			} `json:"image"`
+		} `json:"show"`
 	}
-	if err := json.NewDecoder(io.LimitReader(response.Body, 512<<10)).Decode(&show); err != nil {
+	if err := json.NewDecoder(io.LimitReader(response.Body, 512<<10)).Decode(&candidates); err != nil {
 		return empty
 	}
-	if canonicalTitle(show.Name) != canonicalTitle(title) {
+	var match *Artwork
+	for _, candidate := range candidates {
+		show := candidate.Show
+		if canonicalTitle(show.Name) != canonicalTitle(title) {
+			continue
+		}
+		// Even an exact name is ambiguous when the catalogue lists two shows.
+		if match != nil {
+			return empty
+		}
+		poster := show.Image.Medium
+		if !trustedPosterURL(poster) && trustedPosterURL(show.Image.Original) {
+			poster = show.Image.Original
+		}
+		art := Artwork{}
+		if trustedPosterURL(poster) {
+			art = Artwork{Poster: poster, Credit: "TVmaze"}
+			if trustedTVmazeURL(show.URL) {
+				art.Page = show.URL
+			}
+		}
+		match = &art
+	}
+	if match == nil {
 		return empty
 	}
-	poster := show.Image.Medium
-	if !trustedPosterURL(poster) && trustedPosterURL(show.Image.Original) {
-		poster = show.Image.Original
-	}
-	if !trustedPosterURL(poster) {
-		return empty
-	}
-	art := Artwork{Poster: poster, Credit: "TVmaze"}
-	if trustedTVmazeURL(show.URL) {
-		art.Page = show.URL
-	}
-	return art
+	return *match
 }
+
+// These workers share the same cache as /api/artwork. An XMLTV HTTP request
+// never waits for an image API call. Duplicate/missing titles have a bounded
+// queue; lookups are paced below TVmaze's published unauthenticated limit.
+var artworkBackground = struct {
+	sync.Mutex
+	once    sync.Once
+	pending map[string]bool
+	queue   chan string
+}{pending: make(map[string]bool), queue: make(chan string, 128)}
+
+func artworkCacheIsFresh(entry artworkCacheEntry) bool {
+	ttl := 12 * time.Hour
+	// Negative and transient API failures should be retried sooner.
+	if entry.Art.Poster == "" {
+		ttl = 30 * time.Minute
+	}
+	return time.Since(entry.At) < ttl
+}
+
+func cachedProgrammeArtwork(title string) (string, bool) {
+	clean := artworkTitle(title)
+	if clean == "" {
+		return "", false
+	}
+	key := canonicalTitle(clean)
+	artMu.Lock()
+	entry, found := artCache[key]
+	artMu.Unlock()
+	if !found || !artworkCacheIsFresh(entry) {
+		return "", false
+	}
+	if !trustedPosterURL(entry.Art.Poster) {
+		return "", true
+	} // cached miss
+	return entry.Art.Poster, true
+}
+
+func scheduleProgrammeArtwork(channels []Channel) {
+	seen := make(map[string]bool)
+	for _, ch := range channels {
+		for _, programme := range ch.Programs {
+			clean := artworkTitle(programme.Title)
+			if clean == "" {
+				continue
+			}
+			key := canonicalTitle(clean)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			if _, cached := cachedProgrammeArtwork(clean); cached {
+				continue
+			}
+			artworkBackground.Lock()
+			if artworkBackground.pending[key] {
+				artworkBackground.Unlock()
+				continue
+			}
+			artworkBackground.pending[key] = true
+			select {
+			case artworkBackground.queue <- clean:
+			default:
+				delete(artworkBackground.pending, key)
+			}
+			artworkBackground.Unlock()
+		}
+	}
+	artworkBackground.once.Do(func() {
+		throttle := time.NewTicker(700 * time.Millisecond)
+		for i := 0; i < 2; i++ {
+			go func() {
+				for title := range artworkBackground.queue {
+					<-throttle.C
+					key := canonicalTitle(title)
+					// A concurrent browser lookup might have populated it.
+					if _, exists := cachedProgrammeArtwork(title); !exists {
+						result := lookupArtwork(title)
+						artMu.Lock()
+						artCache[key] = artworkCacheEntry{Art: result, At: time.Now()}
+						artMu.Unlock()
+					}
+					artworkBackground.Lock()
+					delete(artworkBackground.pending, key)
+					artworkBackground.Unlock()
+				}
+			}()
+		}
+	})
+}
+
+func artworkQueueStats() (posters int, misses int, pending int) {
+	artMu.Lock()
+	for _, entry := range artCache {
+		if !artworkCacheIsFresh(entry) {
+			continue
+		}
+		if trustedPosterURL(entry.Art.Poster) {
+			posters++
+		} else {
+			misses++
+		}
+	}
+	artMu.Unlock()
+	artworkBackground.Lock()
+	pending = len(artworkBackground.pending)
+	artworkBackground.Unlock()
+	return
+}
+
 func artworkHandler(w http.ResponseWriter, r *http.Request) {
 	title := artworkTitle(r.URL.Query().Get("title"))
 	if title == "" {
@@ -271,7 +402,7 @@ func artworkHandler(w http.ResponseWriter, r *http.Request) {
 	artMu.Lock()
 	cached, exists := artCache[key]
 	artMu.Unlock()
-	if exists && time.Since(cached.At) < 12*time.Hour {
+	if exists && artworkCacheIsFresh(cached) {
 		jsonResponse(w, cached.Art)
 		return
 	}
@@ -292,15 +423,34 @@ func loadChannels(region string) ChannelData {
 	region = safeRegion(region)
 	cacheMu.Lock()
 	old, ok := cache[region]
-	cacheMu.Unlock()
-	if ok && time.Since(old.at) < 20*time.Minute {
+	if ok {
+		if time.Since(old.at) >= 20*time.Minute && !refreshRunning[region] && time.Since(refreshAttempt[region]) > time.Minute {
+			refreshRunning[region] = true
+			refreshAttempt[region] = time.Now()
+			go func() {
+				defer func() {
+					cacheMu.Lock()
+					refreshRunning[region] = false
+					cacheMu.Unlock()
+				}()
+				// Work outside cacheMu. A failing upstream must not stall tuning.
+				_ = fetchChannels(region, old, true)
+			}()
+		}
+		cacheMu.Unlock()
 		return old.data
 	}
+	cacheMu.Unlock()
+	return fetchChannels(region, cacheEntry{}, false)
+}
+
+func fetchChannels(region string, old cacheEntry, hasOld bool) ChannelData {
 	req, _ := http.NewRequest("GET", sourceBase+region+"/tv.json", nil)
-	req.Header.Set("User-Agent", "AussieTV/1.8.0 (+personal local player)")
+	req.Header.Set("User-Agent", "AussieTV/"+version+" (+personal local player)")
 	response, err := client.Do(req)
 	if err == nil && response.StatusCode != 200 {
 		err = fmt.Errorf("EPG server HTTP %d", response.StatusCode)
+		response.Body.Close()
 	}
 	if err == nil {
 		defer response.Body.Close()
@@ -318,7 +468,7 @@ func loadChannels(region string) ChannelData {
 			err = errors.New("no recognised channels returned")
 		}
 	}
-	if ok {
+	if hasOld {
 		old.data.Warning = "Guide refresh unavailable; using cached listings. Streaming may still work."
 		return old.data
 	}
@@ -333,6 +483,44 @@ func loadChannels(region string) ChannelData {
 	}
 	return data
 }
+
+// Only preserve safe provider HTTP headers for indexed channels. Never accept
+// arbitrary upstream-supplied Host, Authorization, cookies, or proxy headers.
+func providerHeaders(headers map[string]string) map[string]string {
+	out := map[string]string{}
+	ua := strings.TrimSpace(headers["user-agent"])
+	if ua != "" && len(ua) <= 256 && printableHeaderValue(ua) {
+		out["user-agent"] = ua
+	}
+	referer := strings.TrimSpace(headers["referer"])
+	if referer != "" && len(referer) <= 1024 && printableHeaderValue(referer) {
+		if _, err := validateRemote(referer); err == nil {
+			out["referer"] = referer
+		}
+	}
+	return out
+}
+func printableHeaderValue(s string) bool {
+	for _, c := range s {
+		if c < 32 || c > 126 {
+			return false
+		}
+	}
+	return true
+}
+func setProviderRequestHeaders(req *http.Request, ch Channel) {
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36")
+	req.Header.Set("Accept", "*/*")
+	for k, v := range providerHeaders(ch.Headers) {
+		switch k {
+		case "user-agent":
+			req.Header.Set("User-Agent", v)
+		case "referer":
+			req.Header.Set("Referer", v)
+		}
+	}
+}
+
 func makeData(entries map[string]Entry, region string) ChannelData {
 	result := ChannelData{Region: region, Updated: time.Now().Format(time.RFC3339), Source: sourceBase + region + "/tv.json", Channels: []Channel{}}
 	for _, spec := range curated {
@@ -348,7 +536,7 @@ func makeData(entries map[string]Entry, region string) ChannelData {
 		if id == "" {
 			continue
 		}
-		ch := Channel{ID: id, Name: entry.Name, Number: spec.number, Network: entry.Network, Logo: entry.Logo, Stream: entry.Master, Official: official[spec.net], Programs: []Program{}}
+		ch := Channel{ID: id, Name: entry.Name, Number: spec.number, Network: entry.Network, Logo: entry.Logo, Stream: entry.Master, Headers: providerHeaders(entry.Headers), Official: official[spec.net], Programs: []Program{}}
 		var points []Program
 		for _, p := range entry.Programs {
 			if len(p) < 2 {
@@ -556,69 +744,23 @@ func heartbeatWatch() {
 	}
 }
 
-// windowsBrowserCandidates prioritises Edge, then Chrome, without assuming that
-// either browser is installed. App-mode windows expose the site's title and
-// favicon and avoid the address bar; these are still browser-owned windows.
-func windowsBrowserCandidates() []string {
-	paths := make([]string, 0, 8)
-	seen := map[string]bool{}
-	for _, env := range []string{"ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"} {
-		if base := os.Getenv(env); base != "" {
-			for _, candidate := range []string{
-				filepath.Join(base, "Microsoft", "Edge", "Application", "msedge.exe"),
-				filepath.Join(base, "Google", "Chrome", "Application", "chrome.exe"),
-			} {
-				key := strings.ToLower(candidate)
-				if !seen[key] {
-					paths = append(paths, candidate)
-					seen[key] = true
-				}
-			}
-		}
-	}
-	return paths
-}
+// openBrowser always delegates to the OS default URL handler on Windows.
+// The GUI and Settings pages both use the same default browser.
 func openBrowser(addr string) error {
 	if os.Getenv("AUSSIE_TV_NO_BROWSER") == "1" {
 		log.Print("Automatic browser launch disabled for testing")
 		return nil
 	}
 	if runtime.GOOS == "windows" {
-		var failures []string
-		// Prefer a dedicated app-style window on a supported installed browser.
-		// Users can set AUSSIE_TV_BROWSER_MODE=default to retain their default
-		// browser's normal tabs and address bar if preferred.
-		if !strings.EqualFold(os.Getenv("AUSSIE_TV_BROWSER_MODE"), "default") {
-			for _, path := range windowsBrowserCandidates() {
-				if stat, err := os.Stat(path); err != nil || stat.IsDir() {
-					continue
-				}
-				if err := exec.Command(path, "--app="+addr, "--window-size=1360,900").Start(); err == nil {
-					log.Printf("Launched dedicated browser app window: %s", path)
-					return nil
-				} else {
-					failures = append(failures, filepath.Base(path)+": "+err.Error())
-				}
-			}
+		if err := openWindowsDefaultBrowser(addr); err != nil {
+			return fmt.Errorf("open default Windows browser: %w", err)
 		}
-		// Never lose the v1.1 fallback: use the system's URL association.
-		if err := exec.Command("cmd.exe", "/c", "start", "", addr).Start(); err == nil {
-			log.Printf("Requested Windows default browser: %s", addr)
-			return nil
-		} else {
-			failures = append(failures, "cmd/start: "+err.Error())
-		}
-		if err := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", addr).Start(); err == nil {
-			log.Printf("Requested URL using Windows shell: %s", addr)
-			return nil
-		} else {
-			failures = append(failures, "rundll32: "+err.Error())
-		}
-		return fmt.Errorf("no browser could be launched: %s", strings.Join(failures, "; "))
+		log.Printf("Requested Windows default browser: %s", addr)
+		return nil
 	}
 	for _, name := range []string{"xdg-open", "open"} {
-		if p, err := exec.LookPath(name); err == nil {
-			if err := exec.Command(p, addr).Start(); err == nil {
+		if bin, err := exec.LookPath(name); err == nil {
+			if err := exec.Command(bin, addr).Start(); err == nil {
 				return nil
 			}
 		}
@@ -637,8 +779,12 @@ func prepareLogging() {
 	if path != "" {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 		if err == nil {
-			log.SetOutput(io.MultiWriter(os.Stdout, f))
-			fmt.Printf("AussieTV startup log: %s\n", path)
+			if runtime.GOOS == "windows" && os.Getenv("AUSSIETV_DIAGNOSTICS") != "1" {
+				log.SetOutput(f)
+			} else {
+				log.SetOutput(io.MultiWriter(os.Stdout, f))
+				fmt.Printf("AussieTV startup log: %s\n", path)
+			}
 		} else {
 			fmt.Fprintf(os.Stderr, "Cannot write log %s: %v\n", path, err)
 		}
@@ -649,8 +795,7 @@ func startupFailure(err error) {
 	log.Printf("STARTUP FAILED: %v", err)
 	fmt.Fprintln(os.Stderr, "AussieTV couldn't start. The error is above.")
 	if runtime.GOOS == "windows" {
-		fmt.Fprintln(os.Stderr, "Press Enter to close this window...")
-		_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+		nativeAlert("AussieTV failed to start", err.Error()+"\nSee %LOCALAPPDATA%\\AussieTV\\startup.log")
 	}
 	os.Exit(1)
 }
@@ -662,6 +807,8 @@ func serveAppAsset(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/":
 		path, mime = "static/index.html", "text/html; charset=utf-8"
+	case "/settings":
+		path, mime = "static/settings.html", "text/html; charset=utf-8"
 	case "/app-icon.svg":
 		path, mime = "static/app-icon.svg", "image/svg+xml"
 	case "/aussietv-logo.svg":
@@ -689,7 +836,7 @@ func serveAppAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", mime)
-	if path == "static/index.html" {
+	if path == "static/index.html" || path == "static/settings.html" {
 		w.Header().Set("Cache-Control", "no-store")
 	} else {
 		w.Header().Set("Cache-Control", "public, max-age=3600")
@@ -698,18 +845,102 @@ func serveAppAsset(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
+var teletextService *teletext.Service
+
+func initTeletext() error {
+	b, err := assets.ReadFile("config/teletext.json")
+	if err != nil {
+		return err
+	}
+	configPath := os.Getenv("AUSSIETV_TELETEXT_CONFIG")
+	if configPath == "" {
+		if exe, e := os.Executable(); e == nil {
+			candidate := filepath.Join(filepath.Dir(exe), "teletext.json")
+			if _, e := os.Stat(candidate); e == nil {
+				configPath = candidate
+			}
+		}
+	}
+	if configPath != "" {
+		b, err = os.ReadFile(configPath)
+		if err != nil {
+			return fmt.Errorf("load teletext page map: %w", err)
+		}
+	}
+	cfg, err := teletext.LoadConfig(b)
+	if err != nil {
+		return err
+	}
+	teletextService = teletext.New(cfg, func(region string) []teletext.Channel {
+		data := loadChannels(region)
+		result := make([]teletext.Channel, 0, len(data.Channels))
+		for _, ch := range data.Channels {
+			row := teletext.Channel{Name: ch.Name, Network: ch.Network, Number: ch.Number}
+			for _, p := range ch.Programs {
+				row.Programmes = append(row.Programmes, teletext.Programme{Name: p.Title, Start: time.Unix(p.Start, 0), End: time.Unix(p.End, 0)})
+			}
+			result = append(result, row)
+		}
+		return result
+	})
+	return nil
+}
+
 func main() {
+	if code, handled := maybeRunFirewallHelper(os.Args); handled {
+		os.Exit(code)
+	}
 	prepareLogging()
+	if err := initTeletext(); err != nil {
+		log.Printf("Teletext unavailable: %v", err)
+	}
+
 	serverMode := os.Getenv("AUSSIETV_MODE") == "server"
-	feedCfg, feedEnabled, feedErr := jellyfinConfigFromEnv()
+	feedCfg, envEnabled, feedErr := jellyfinConfigFromEnv()
 	if feedErr != nil {
 		startupFailure(feedErr)
 	}
-	if serverMode && !feedEnabled {
-		startupFailure(errors.New("server mode requires AUSSIETV_JELLYFIN_BIND and feed credentials"))
+	if serverMode && !envEnabled {
+		startupFailure(errors.New("server mode requires configured Jellyfin feed credentials"))
+	}
+	supervisor := &feedSupervisor{}
+	defer supervisor.Close()
+	var settings *settingsController
+	if !serverMode {
+		var err error
+		settings, err = newSettingsController(supervisor, envEnabled)
+		if err != nil {
+			// Never hide the entire TV app because an older/corrupted settings file
+			// cannot be loaded. Keep the original file for diagnostics.
+			log.Printf("Cannot load saved settings: %v", err)
+			settings, err = newDefaultSettingsController(supervisor, envEnabled)
+			if err != nil {
+				startupFailure(fmt.Errorf("create default settings: %w", err))
+			}
+		}
+	}
+	if envEnabled {
+		if settings != nil {
+			settings.config = desktopSettings{Enabled: true, LAN: strings.HasPrefix(feedCfg.Bind, "0.0.0.0:"), Discovery: feedCfg.Discovery, StreamMode: feedCfg.StreamMode, BaseURL: feedCfg.BaseURL, Region: feedCfg.Region, Key: feedCfg.Key}
+		}
+		if err := supervisor.Replace(feedCfg, true); err != nil {
+			if serverMode {
+				startupFailure(fmt.Errorf("Jellyfin feed listener: %w", err))
+			}
+			log.Printf("Jellyfin feed unavailable (TV interface still starts): %v", err)
+		}
+	} else if settings != nil {
+		cfg, enabled := desktopToJellyfin(settings.config)
+		if err := supervisor.Replace(cfg, enabled); err != nil {
+			// This is an optional network integration, never a fatal TV startup error.
+			log.Printf("Jellyfin feed unavailable (TV interface still starts): %v", err)
+		}
 	}
 	log.Printf("AussieTV v%s starting on %s/%s", version, runtime.GOOS, runtime.GOARCH)
 	mux := http.NewServeMux()
+	if teletextService != nil {
+		mux.Handle("GET /teletext/", teletextService.Handler())
+	}
 	mux.HandleFunc("GET /", serveAppAsset)
 	mux.HandleFunc("GET /api/artwork", artworkHandler)
 	mux.HandleFunc("GET /api/logo", logoHandler)
@@ -719,6 +950,10 @@ func main() {
 	})
 	mux.HandleFunc("POST /api/heartbeat", func(w http.ResponseWriter, r *http.Request) { markPing(); w.WriteHeader(204) })
 	mux.HandleFunc("GET /hls", hlsHandler)
+	if settings != nil {
+		mux.HandleFunc("GET /api/settings", settings.handler)
+		mux.HandleFunc("POST /api/settings", settings.handler)
+	}
 	mux.HandleFunc("GET /channel.m3u", func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Query().Get("ch")
 		d := loadChannels(r.URL.Query().Get("region"))
@@ -733,20 +968,18 @@ func main() {
 		http.NotFound(w, r)
 	})
 	mux.HandleFunc("POST /api/quit", func(w http.ResponseWriter, r *http.Request) {
-		if serverMode {
-			http.Error(w, "Quit disabled in server mode", http.StatusForbidden)
+		// Browser windows never own the lifetime of a tray application.
+		if serverMode || trayReady.Load() {
+			http.Error(w, "Use the tray menu to exit", http.StatusForbidden)
 			return
 		}
-		markPing()
 		w.WriteHeader(204)
 		go func() {
-			time.Sleep(400 * time.Millisecond)
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 			_ = server.Shutdown(ctx)
 		}()
 	})
-	// Use a predictable local URL for easier diagnosis and manual browser opening.
 	listener, err := net.Listen("tcp", "127.0.0.1:45781")
 	if err != nil {
 		log.Printf("Port 45781 unavailable (%v); trying a free port", err)
@@ -756,62 +989,52 @@ func main() {
 		startupFailure(err)
 	}
 	server = &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// The application is bound to loopback. Reject other Host headers to
-		// prevent DNS-rebinding access from unrelated web origins.
 		host := r.Host
 		if h, _, err := net.SplitHostPort(host); err == nil {
 			host = h
 		}
 		if host != "127.0.0.1" && host != "localhost" {
-			http.Error(w, "Invalid local host", http.StatusForbidden)
+			http.Error(w, "Invalid local host", 403)
 			return
 		}
 		if origin := r.Header.Get("Origin"); origin != "" {
 			u, err := url.Parse(origin)
 			if err != nil || u.Host != r.Host || u.Scheme != "http" {
-				http.Error(w, "Invalid request origin", http.StatusForbidden)
+				http.Error(w, "Invalid origin", 403)
 				return
 			}
 		}
 		mux.ServeHTTP(w, r)
 	}), ReadHeaderTimeout: 10 * time.Second}
 	addr := "http://" + listener.Addr().String()
-	fmt.Println("-----------------------------------------------------------")
-	fmt.Println("AUSSIE TV IS STARTING")
-	fmt.Println("If the TV window doesn't open, paste this into your browser:")
-	fmt.Println("  " + addr)
-	fmt.Println("Keep this window open while watching TV.")
-	fmt.Println("-----------------------------------------------------------")
-	log.Println("AussieTV listening at", addr)
-	if feedEnabled {
-		feedListener, err := net.Listen("tcp", feedCfg.Bind)
-		if err != nil {
-			startupFailure(fmt.Errorf("Jellyfin feed listener: %w", err))
-		}
-		feedServer := &http.Server{Handler: newJellyfinHandler(feedCfg, loadChannels), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, WriteTimeout: 45 * time.Second, MaxHeaderBytes: 1 << 16}
-		go func() {
-			if err := feedServer.Serve(feedListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Printf("Jellyfin feed listener stopped: %v", err)
+	log.Printf("AussieTV listening at %s", addr)
+	if !serverMode {
+		if runtime.GOOS == "windows" && os.Getenv("AUSSIETV_NO_TRAY") != "1" {
+			logFile := filepath.Join(os.Getenv("LOCALAPPDATA"), "AussieTV", "startup.log")
+			stop := func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				_ = server.Shutdown(ctx)
 			}
-		}()
-		log.Printf("Jellyfin feed enabled on %s (region %s)", feedListener.Addr(), feedCfg.Region)
-		// Do not print the key or tokenised Jellyfin URLs in logs.
-	}
-	if !serverMode {
-		go heartbeatWatch()
-	}
-	if !serverMode {
+			if err := startTray(addr, addr+"/settings", logFile, stop); err != nil {
+				log.Printf("Tray registration failed; continuing in browser mode: %v", err)
+				go heartbeatWatch()
+			} else {
+				trayReady.Store(true)
+			}
+		} else {
+			go heartbeatWatch()
+		}
 		go func() {
-			time.Sleep(250 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 			if err := openBrowser(addr); err != nil {
-				log.Printf("BROWSER LAUNCH FAILED: %v", err)
-				fmt.Printf("Open your browser manually at: %s\n", addr)
+				log.Printf("Could not open browser: %v", err)
 			}
 		}()
 	}
 	err = server.Serve(listener)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		startupFailure(fmt.Errorf("server stopped unexpectedly: %w", err))
+		startupFailure(fmt.Errorf("server stopped: %w", err))
 	}
 	log.Println("AussieTV stopped")
 }
