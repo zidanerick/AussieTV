@@ -1,0 +1,43 @@
+name: Prepare verified Windows FFmpeg for AussieTV
+on:
+  push:
+    branches:
+      - preview/ffmpeg-binary-for-v206
+permissions:
+  contents: read
+jobs:
+  fetch-ffmpeg:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download and verify FFmpeg Essentials from upstream Windows provider
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $url = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip'
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg-upstream.zip
+          Invoke-WebRequest -Uri "$url.sha256" -OutFile ffmpeg-upstream.zip.sha256
+          $expected = [regex]::Match((Get-Content ffmpeg-upstream.zip.sha256 -Raw), '(?i)\b[a-f0-9]{64}\b').Value.ToLowerInvariant()
+          if ($expected.Length -ne 64) { throw 'Invalid upstream checksum' }
+          $actual = (Get-FileHash ffmpeg-upstream.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw 'Upstream FFmpeg SHA-256 verification failed' }
+          Expand-Archive ffmpeg-upstream.zip -DestinationPath upstream
+          $exe = @(Get-ChildItem -Path upstream -Recurse -Filter ffmpeg.exe -File)
+          if ($exe.Count -ne 1) { throw "Expected exactly one ffmpeg.exe; found $($exe.Count)" }
+          New-Item -ItemType Directory -Path portable/ffmpeg -Force | Out-Null
+          Copy-Item $exe[0].FullName portable/ffmpeg/ffmpeg.exe
+          $ver = & ./portable/ffmpeg/ffmpeg.exe -version | Select-Object -First 1
+          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg binary could not run on Windows' }
+          @("Source: $url", "Archive SHA-256: $actual", "Version: $ver", "Static FFmpeg Essentials build is licensed GPLv3.", "Upstream source: https://ffmpeg.org/download.html", "Build recipes: https://github.com/GyanD/codexffmpeg") | Set-Content -Path portable/ffmpeg/BUILD-INFO.txt -Encoding UTF8
+          foreach ($license in Get-ChildItem upstream -Recurse -File | Where-Object { $_.Name -match '^(LICENSE|COPYING)(\.[a-zA-Z0-9_-]+)?$' }) {
+            Copy-Item $license.FullName (Join-Path 'portable/ffmpeg' ('upstream-' + $license.Name)) -Force
+          }
+          Compress-Archive portable/* -DestinationPath AussieTV-Verified-FFmpeg-Windows.zip -Force
+          Get-FileHash AussieTV-Verified-FFmpeg-Windows.zip -Algorithm SHA256 | Format-List
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AussieTV-Verified-FFmpeg-Windows
+          path: AussieTV-Verified-FFmpeg-Windows.zip
+          retention-days: 7
+          if-no-files-found: error
