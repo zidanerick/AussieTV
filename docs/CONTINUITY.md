@@ -1,7 +1,7 @@
 # AussieTV project continuity / future-chat handoff
 
-**Last documented:** 16 November 2026  
-**Current code:** v1.8.0 on `feature/v1.8-remote-jellyfin` (merge pending)  
+**Last documented:** 18 November 2026  
+**Current code:** v1.8.0 on `main` (PR #13 merged; `6e3a900ccd9dcf5f1fdb82c7e9479dd742334029`)  
 **Repository:** https://github.com/zidanerick/AussieTV
 
 ## User goal

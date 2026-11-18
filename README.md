@@ -60,6 +60,11 @@ Package `AussieTV.exe`, `RUN-AussieTV.cmd`, `README.txt` and `assets/AussieTV.ic
 | v1.4 | [versions/v1.4](https://github.com/zidanerick/AussieTV/tree/versions/v1.4) | Original app logo, browser favicon, multi-size Windows shortcut icon and brand asset tooling |
 | v1.5.1 | `main` | Embedded Windows EXE icon and app-style window launch with reliable fallback |
 
+| v1.6 | [versions/v1.6](https://github.com/zidanerick/AussieTV/tree/versions/v1.6) | Caption tracks and Teletext-inspired information pages |
+| v1.7 | [versions/v1.7](https://github.com/zidanerick/AussieTV/tree/versions/v1.7) | Remote support and all-channel logos |
+| v1.7.1 | [versions/v1.7.1](https://github.com/zidanerick/AussieTV/tree/versions/v1.7.1) | Guide-row and dropdown navigation fixes |
+| v1.8 | [versions/v1.8](https://github.com/zidanerick/AussieTV/tree/versions/v1.8) | No-trap remote navigation and Jellyfin M3U/XMLTV Docker feed |
+
 Full details: [CHANGELOG.md](CHANGELOG.md).
 
 ## Important limitations
