@@ -1,0 +1,21 @@
+services:
+  aussietv:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "45782:45782"
+    environment:
+      AUSSIETV_MODE: server
+      AUSSIETV_JELLYFIN_BIND: 0.0.0.0:45782
+      AUSSIETV_JELLYFIN_BASE_URL: ${AUSSIETV_JELLYFIN_BASE_URL:?Provide your server LAN base URL in .env}
+      AUSSIETV_JELLYFIN_KEY: ${AUSSIETV_JELLYFIN_KEY:?Set a long random key in .env}
+      AUSSIETV_JELLYFIN_REGION: ${AUSSIETV_JELLYFIN_REGION:-Melbourne}
+    volumes:
+      - aussietv-cache:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  aussietv-cache:

@@ -56,3 +56,19 @@ test('left and right never jump diagonally to another visual row',()=>{
  const onlyDiagonal={querySelectorAll(){return [from,nextRow]}};
  assert.equal(r.nearest(from,'ArrowRight',onlyDiagonal),null);
 });
+
+test('every remote section has explicit exits in all directions',()=>{
+ const {transitions}=r;
+ for(const section of ['filters','top','player','now','quick','guideActions','guide']){
+  for(const dir of ['left','right','up','down']){
+   const target=transitions[section]?.[dir];
+   assert.ok(target,`${section} has no ${dir} exit`);
+   assert.ok(transitions[target],`${section}/${dir} targets unknown group ${target}`);
+  }
+ }
+ for(const start of Object.keys(transitions)){
+  const seen=new Set([start]),todo=[start];
+  while(todo.length){const cur=todo.shift();for(const target of Object.values(transitions[cur]))if(!seen.has(target)){seen.add(target);todo.push(target)}}
+  assert.equal(seen.size,Object.keys(transitions).length,`${start} cannot reach all sections`);
+ }
+});

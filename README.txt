@@ -1,4 +1,4 @@
-AussieTV v1.7.1 - Live Australian Television for Windows
+AussieTV v1.8.0 - Live Australian Television for Windows
 ======================================================
 
 WHAT'S NEW IN V1.2
@@ -107,9 +107,15 @@ AUSSIETV v1.7: REMOTE / CROSS-BROWSER INPUT
 - Hardware special keys must be delivered to the browser by the TV OS or remote adapter.
 - HLS playback is provided through Hls.js or native HLS where the browser supports it.
 
-NEW IN v1.7.1
-- The D-pad's left/right navigation stays on one visual row, including
-  player controls and program guide cells.
-- Focused Region/CC dropdowns change only after pressing OK to edit:
-  Up/Down adjusts a candidate, OK applies it and Back cancels it.
-- Browser playback and the existing Windows launcher are unchanged.
+NEW IN V1.7.1
+- Remote left/right movement stays in the same row; guide boundaries do not
+  unexpectedly jump to unrelated player buttons or programmes.
+- Region and caption selectors do not change until you press OK to enter
+  edit mode. Use Up/Down to choose and OK again to apply; Back cancels.
+- Using a mouse or touch continues to work with the normal controls.
+
+AUSSIE TV v1.8.0
+- Remote navigation no longer leaves you trapped at the ends of control groups.
+- Jellyfin integration is available through optional M3U/XMLTV LAN endpoints.
+- Jellyfin mode requires environment variables and an explicit secret; see docs/JELLYFIN.md in source.
+- HDHomeRun discovery and direct network TV UI are not implemented yet.

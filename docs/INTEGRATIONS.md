@@ -35,3 +35,7 @@ References: https://jellyfin.org/docs/general/server/live-tv/setup-guide/ and ht
 3. Add an authenticated server mode and Docker image, verifying localhost and LAN security separately.
 4. Implement M3U/XMLTV exports, import into Jellyfin's standard Live TV, validate real streams and guide matching.
 5. Scope a plugin only for gaps that Jellyfin Live TV does not already cover, with its own project/tests.
+
+## Initial Jellyfin feeds (v1.8)
+
+See [Jellyfin setup](JELLYFIN.md) for opt-in M3U/XMLTV endpoints, stream redirects, separate authenticated LAN listener, and feed-only Docker/Unraid recipe. This is **not** full Docker-hosted browser UI or HDHomeRun emulation.

@@ -1,0 +1,10 @@
+.git
+.github
+*.zip
+*.exe
+*.syso
+*.log
+.env
+node_modules
+__pycache__
+tests

@@ -33,7 +33,7 @@ import (
 var assets embed.FS
 
 const sourceBase = "https://i.mjh.nz/au/"
-const version = "1.7.1"
+const version = "1.8.0"
 
 type Entry struct {
 	Chno     any               `json:"chno,omitempty"`
@@ -297,7 +297,7 @@ func loadChannels(region string) ChannelData {
 		return old.data
 	}
 	req, _ := http.NewRequest("GET", sourceBase+region+"/tv.json", nil)
-	req.Header.Set("User-Agent", "AussieTV/1.7.1 (+personal local player)")
+	req.Header.Set("User-Agent", "AussieTV/1.8.0 (+personal local player)")
 	response, err := client.Do(req)
 	if err == nil && response.StatusCode != 200 {
 		err = fmt.Errorf("EPG server HTTP %d", response.StatusCode)
@@ -700,6 +700,14 @@ func serveAppAsset(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	prepareLogging()
+	serverMode := os.Getenv("AUSSIETV_MODE") == "server"
+	feedCfg, feedEnabled, feedErr := jellyfinConfigFromEnv()
+	if feedErr != nil {
+		startupFailure(feedErr)
+	}
+	if serverMode && !feedEnabled {
+		startupFailure(errors.New("server mode requires AUSSIETV_JELLYFIN_BIND and feed credentials"))
+	}
 	log.Printf("AussieTV v%s starting on %s/%s", version, runtime.GOOS, runtime.GOARCH)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", serveAppAsset)
@@ -725,6 +733,10 @@ func main() {
 		http.NotFound(w, r)
 	})
 	mux.HandleFunc("POST /api/quit", func(w http.ResponseWriter, r *http.Request) {
+		if serverMode {
+			http.Error(w, "Quit disabled in server mode", http.StatusForbidden)
+			return
+		}
 		markPing()
 		w.WriteHeader(204)
 		go func() {
@@ -771,14 +783,32 @@ func main() {
 	fmt.Println("Keep this window open while watching TV.")
 	fmt.Println("-----------------------------------------------------------")
 	log.Println("AussieTV listening at", addr)
-	go heartbeatWatch()
-	go func() {
-		time.Sleep(250 * time.Millisecond)
-		if err := openBrowser(addr); err != nil {
-			log.Printf("BROWSER LAUNCH FAILED: %v", err)
-			fmt.Printf("Open your browser manually at: %s\n", addr)
+	if feedEnabled {
+		feedListener, err := net.Listen("tcp", feedCfg.Bind)
+		if err != nil {
+			startupFailure(fmt.Errorf("Jellyfin feed listener: %w", err))
 		}
-	}()
+		feedServer := &http.Server{Handler: newJellyfinHandler(feedCfg, loadChannels), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, WriteTimeout: 45 * time.Second, MaxHeaderBytes: 1 << 16}
+		go func() {
+			if err := feedServer.Serve(feedListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Printf("Jellyfin feed listener stopped: %v", err)
+			}
+		}()
+		log.Printf("Jellyfin feed enabled on %s (region %s)", feedListener.Addr(), feedCfg.Region)
+		// Do not print the key or tokenised Jellyfin URLs in logs.
+	}
+	if !serverMode {
+		go heartbeatWatch()
+	}
+	if !serverMode {
+		go func() {
+			time.Sleep(250 * time.Millisecond)
+			if err := openBrowser(addr); err != nil {
+				log.Printf("BROWSER LAUNCH FAILED: %v", err)
+				fmt.Printf("Open your browser manually at: %s\n", addr)
+			}
+		}()
+	}
 	err = server.Serve(listener)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		startupFailure(fmt.Errorf("server stopped unexpectedly: %w", err))

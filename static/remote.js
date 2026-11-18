@@ -1,4 +1,4 @@
-/* AussieTV TV remote and keyboard navigation, v1.7.1. No external dependencies.
+/* AussieTV TV remote and keyboard navigation, v1.8. No external dependencies.
  * Native buttons/links/selects remain accessible for touch, mouse and keyboard.
  * Can be reused in a later container-hosted web UI. */
 (function(){
@@ -9,6 +9,7 @@
  const legacyKeys={37:'ArrowLeft',38:'ArrowUp',39:'ArrowRight',40:'ArrowDown',13:'Enter',27:'Escape',8:'Back',4:'Back',461:'Back',10009:'Back',427:'ChannelUp',428:'ChannelDown',33:'PageUp',34:'PageDown',179:'MediaPlayPause'};
  let modalReturn=null, textReturn=null, numeric='',numericTimer=null,hudTimer=null;
  let editingSelect=null,selectOriginalValue='';
+ let lastSection='guide';
  function keyOf(event){
   const key=event.key;
   if(key && key!=='Unidentified' && key!=='Dead' && key!=='Process'){
@@ -115,23 +116,85 @@
   if(idx>=0&&idx<options.length)editingSelect.selectedIndex=idx;
   notice((editingSelect.options[editingSelect.selectedIndex]?.textContent||'')+' · OK to apply · Back to cancel',2500);
  }
- function move(key){
-  const scope=isDialogOpen()?$('remoteHelpPanel'):(!$('textPanel').hidden?$('textPanel'):document);
-  const active=document.activeElement;
-  if(!usable(active)||!scope.contains(active)||!active.matches(focusable)){
-   // Avoid a jump to a programme when the browser hands focus to native video.
-   const playerControl=active===$('video')?firstFocusable(document.querySelector('.player-bottom')):null;
-   scrollFocus(playerControl||(isDialogOpen()||!$('textPanel').hidden?firstFocusable(scope):guideFocus()));return;
+ // A D-pad must never hit a dead end. Spatial search runs inside the current
+ // logical section first; at a boundary, an explicit section graph takes over.
+ // This also avoids wide video/EPG geometry pulling focus diagonally.
+ const sections={
+  filters:'#filters', top:'.top-actions', player:'.player-bottom',
+  now:'.now-actions', quick:'#quickChannels', guideActions:'.guide-actions',
+  guide:'#guide'
+ };
+ const transitions={
+  filters:{left:'top',right:'guide',up:'top',down:'guide'},
+  top:{left:'filters',right:'player',up:'filters',down:'player'},
+  player:{left:'filters',right:'now',up:'top',down:'quick'},
+  now:{left:'player',right:'quick',up:'top',down:'quick'},
+  quick:{left:'filters',right:'guideActions',up:'now',down:'guideActions'},
+  guideActions:{left:'quick',right:'guide',up:'quick',down:'guide'},
+  guide:{left:'filters',right:'guideActions',up:'guideActions',down:'guideActions'}
+ };
+ function sectionOf(element){
+  if(!element?.closest)return null;
+  for(const [name,selector] of Object.entries(sections))if(element.closest(selector))return name;
+  // Treat the retry button (outside player-bottom) as part of the player.
+  if(element.closest('#player'))return 'player';
+  return null;
+ }
+ function sectionElement(name){return document.querySelector(sections[name]||'#guide')}
+ function nearestAny(current,scope){
+  const nodes=candidates(scope);if(!nodes.length)return null;
+  if(!current?.getBoundingClientRect)return nodes[0];
+  const a=current.getBoundingClientRect(),x=a.left+a.width/2,y=a.top+a.height/2;
+  nodes.sort((m,n)=>{
+   const d=r=>{const t=r.getBoundingClientRect();return Math.abs(t.left+t.width/2-x)+Math.abs(t.top+t.height/2-y)};
+   return d(m)-d(n);
+  });
+  return nodes[0];
+ }
+ function exitSection(active,key,section){
+  const dir=directions[key];if(!dir)return false;
+  const target=transitions[section]?.[dir];
+  if(!target)return false;
+  // A target section can be empty while the EPG loads or in a narrow layout.
+  const order=[target,'guide','filters','top','quick','now','player','guideActions'];
+  for(const name of [...new Set(order)]){
+   const scope=sectionElement(name);
+   if(!scope)continue;
+   const node=nearestAny(active,scope);
+   if(node&&node!==active)return scrollFocus(node);
   }
-  if(!isDialogOpen()&&$('textPanel').hidden&&active.matches('#guide .channel-cell,#guide .show-cell')){
-   // The guide is a logical grid: at its edges, stay put instead of jumping
-   // diagonally to the player or unrelated controls.
-   moveGuideFocus(active,key);
-   if(document.activeElement!==active)scrollFocus(document.activeElement);
+  return false;
+ }
+ function move(key){
+  const overlay=isDialogOpen()||!$('textPanel').hidden;
+  const scope=isDialogOpen()?$('remoteHelpPanel'):(!$('textPanel').hidden?$('textPanel'):document);
+  let active=document.activeElement;
+  if(!usable(active)||!scope.contains(active)||!active.matches(focusable)){
+   // A dynamic redraw can delete the focused element. Recover in its former
+   // section rather than sending the viewer back to the beginning of the guide.
+   const preferred=overlay?firstFocusable(scope):firstFocusable(sectionElement(lastSection));
+   const playerControl=active===$('video')?firstFocusable(document.querySelector('.player-bottom')):null;
+   scrollFocus(playerControl||preferred||guideFocus());return;
+  }
+  if(overlay){
+   const next=nearest(active,key,scope);
+   if(next){scrollFocus(next);return}
+   const list=candidates(scope);
+   if(list.length>1)scrollFocus(key==='ArrowLeft'||key==='ArrowUp'?list[list.length-1]:list[0]);
    return;
   }
-  const next=nearest(active,key,scope);
-  if(next)scrollFocus(next);
+  const section=sectionOf(active);
+  if(section==='guide'){
+   // Preserve logical programme-grid movement, but permit leaving every edge.
+   moveGuideFocus(active,key);
+   if(document.activeElement!==active){scrollFocus(document.activeElement);return}
+   exitSection(active,key,'guide');return;
+  }
+  const container=section&&sectionElement(section);
+  const next=container?nearest(active,key,container):nearest(active,key,scope);
+  if(next){scrollFocus(next);return}
+  if(section&&exitSection(active,key,section))return;
+  scrollFocus(guideFocus());
  }
  function back(){
   if(editingSelect){finishSelect(false);return}
@@ -229,6 +292,7 @@
  document.addEventListener('keydown',handle,true);
  document.addEventListener('focusin',event=>{
   if(editingSelect&&event.target!==editingSelect)finishSelect(false);
+  const section=sectionOf(event.target);if(section)lastSection=section;
  });
  $('remoteHelp').addEventListener('click',()=>showHelp(true));
  $('remoteHelpClose').addEventListener('click',()=>showHelp(false));
@@ -245,5 +309,5 @@
  syncMediaControls();
  // Expose pure-ish primitives to the browser integration tests without
  // creating a separate dependency on a browser framework.
- window.AussieTVRemote={keyOf,nearest,candidates,move,back,showHelp,showText,guideFocus,sameVisualRow,horizontalZone};
+ window.AussieTVRemote={keyOf,nearest,candidates,move,back,showHelp,showText,guideFocus,sameVisualRow,horizontalZone,sectionOf,exitSection,transitions};
 })();
