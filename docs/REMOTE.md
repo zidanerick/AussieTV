@@ -6,9 +6,9 @@ The existing TV interface can now be operated without a mouse when a remote emit
 
 | Key / button | Action |
 | --- | --- |
-| Arrow keys / D-pad | Left/right stays in a visual row; up/down moves between rows and guide channels |
-| OK, Select, Enter | Activate an item, or start/commit editing a region/subtitle selector |
-| Back, Escape, Backspace | Cancel selector editing, close overlays/fullscreen or return to guide |
+| Arrow keys / D-pad | Left/right move along the same row; up/down move between rows and programmes |
+| OK, Select, Enter | Activate the highlighted control; start/commit an explicit dropdown edit |
+| Back, Escape, Backspace | Cancel dropdown edits, close help/Text/fullscreen or return to guide |
 | CH+/CH-, Page Up/Page Down | Previous/next channel |
 | Numbers | Enter broadcast channel number (e.g. 2 then 4 for ABC News 24); commits after about 1 second |
 | G, Home | Jump to guide |
@@ -19,9 +19,9 @@ The existing TV interface can now be operated without a mouse when a remote emit
 | F | Fullscreen, where the browser permits it |
 | Space or media Play/Pause | Toggle stream playback; Space activates a focused button |
 
-**In-app controls**: the player also exposes Play/Pause and Mute buttons. All buttons, links, favourites, source regions, CC selector and Text pages remain accessible via D-pad/OK. Region and CC `<select>` controls do **not** change when arrows move focus. Press **OK** to enter edit mode (green focus ring), **Up/Down** to preview a different option, **OK** again to commit and **Back/Escape** to cancel. Normal mouse/touch selection still works. The help overlay traps D-pad navigation until closed.
+**In-app controls**: the player also exposes Play/Pause and Mute buttons. All buttons, links, favourites, source regions, CC selector and Text pages remain accessible via D-pad/OK. On a focused region or CC dropdown, directional keys navigate the screen until you press **OK**. While editing, Up/Down changes the selected item; **OK** commits, while **Back/Escape** restores the previous selection without applying it. Outside edit mode, Back returns to the guide. The help overlay traps D-pad navigation until closed.
 
-Visual focus uses a high-contrast yellow outline. Scrolling is performed when focus moves, including inside the guide. Programme guide navigation retains time proximity when moving between channels.
+Visual focus uses a high-contrast yellow outline, and an active dropdown edit has a green outline. The guide is a strict row-based navigation grid: at a row edge, left/right stops rather than jumping to the player. Scrolling is performed when focus moves, including inside the guide. Programme guide navigation retains time proximity when moving between channels.
 
 ## Browser support and verification
 
@@ -48,4 +48,6 @@ The Python test renders HTML in memory with mocked guide JSON, avoiding network 
 - Make the programme guide more efficient with large channel counts; track focus restoration when channel data is refreshed concurrently.
 - Use an authenticated network host when Docker mode is implemented. Existing desktop-only endpoints, heartbeat and localhost security rules are *not* ready to expose to a LAN.
 
-**v1.7.1:** Horizontal navigation is deliberately limited to visually aligned controls, and guide boundary arrows do not jump to the player. Regression tests use mocked programmes and two Chromium viewport widths. Other browsers and physical TV remotes still need direct validation.
+## v1.8: focus exit routes
+
+When a group or guide edge has no next item in the requested direction, the remote moves to a named neighboring section instead of remaining stuck. The section graph covers the sidebar, top controls, player controls, on-air actions, quick channels, guide controls and EPG. Modal Text/help retain Back-to-close. Region/caption dropdowns remain explicit OK-to-edit with Back-to-cancel. Headless Chromium with mock guide and focusable elements validates these transitions; real TV browser hardware is not yet tested.

@@ -29,3 +29,6 @@
 18. A separate Docker server mode must change localhost-only lifecycle and authentication/Host/Origin assumptions before exposure; avoid trivial 0.0.0.0 binding. Jellyfin supports M3U/XMLTV without a plugin. See docs/INTEGRATIONS.md.
 
 15. In v1.7.1 and later, keep remote left/right within the visual control row, prevent guide-edge fallthrough, and require an explicit OK-to-edit mode for region/CC selectors with Back cancel and OK commit. Regression-test all four cases across at least two viewport widths; do not restore implicit select arrow changes.
+
+15. Preserve v1.8 D-pad section exit routes and test reachability across all named focus groups. Do not reintroduce guide edge or selector traps.
+16. Jellyfin integration is separate from the desktop loopback server. Do not expose the localhost player, quit, heartbeat, HLS or logo proxy on its LAN port. Keep read-only feed authentication and limit redirects to indexed channels. See `docs/JELLYFIN.md`.

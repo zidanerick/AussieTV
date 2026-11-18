@@ -2,7 +2,7 @@
 
 A lightweight, portable Windows 10/11 application for watching Australian free-to-air TV streams with a television-style electronic programme guide (EPG).
 
-**Current source version: v1.7.1.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
+**Current source version: v1.8.0.** Windows x64, Go 1.22+, browser-based UI served locally by the executable. There is no installation or Python runtime.
 
 ## Run
 
@@ -11,6 +11,9 @@ Download a **Windows build artifact** from the latest successful [GitHub Actions
 If your browser does not open, visit `http://127.0.0.1:45781`. If the port is occupied, use the alternate address printed by the application. Logs are written to `%LOCALAPPDATA%\AussieTV\startup.log`.
 
 ## Features
+
+- v1.8.0: remote D-pad focus exits at all section/guide boundaries without relying on Escape, while preserving OK-to-edit dropdowns.
+- v1.8.0: optional separate authenticated Jellyfin M3U tuner / XMLTV guide feed, plus feed-only Docker and Unraid setup. See [Jellyfin integration](docs/JELLYFIN.md). This is not HDHomeRun discovery or a public web interface.
 
 - Full TV remote navigation using D-pad, OK, Back, channel up/down, numeric tuning and a remote-help overlay; use keyboard or remote bridge that emits browser key events.
 - Player-controlled Play/Pause and Mute for browsers with inconsistent native media controls, plus high-contrast focus and resilient guide focus.
@@ -92,3 +95,7 @@ Read [TV remote and browser compatibility](docs/REMOTE.md) and [Docker/Jellyfin 
 ### v1.7.1 remote navigation repair
 
 Left/right now stays inside the same visual row and control group, and guide edge navigation no longer jumps to unrelated player controls. Region and caption dropdowns require **OK to edit**, **Up/Down to choose**, **OK to apply**, and **Back/Escape to cancel**, without changing the region merely from focus navigation. See [docs/REMOTE.md](docs/REMOTE.md). The portable Windows launcher and playback code are otherwise unchanged.
+
+## Jellyfin and Docker integration (v1.8)
+
+Configure a separate opt-in read-only feed listener using `AUSSIETV_JELLYFIN_BIND`, `AUSSIETV_JELLYFIN_BASE_URL`, and a long `AUSSIETV_JELLYFIN_KEY`. Jellyfin can import its M3U and XMLTV URLs without a plugin. See [docs/JELLYFIN.md](docs/JELLYFIN.md), `Dockerfile` and `compose.yaml`. Direct playback follows current upstream streams and may be subject to DRM, geographic or provider restrictions. Current LAN service does not expose the interactive web UI.

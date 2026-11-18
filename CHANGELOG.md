@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.8.0 (18 November 2026)
+- Use a deterministic D-pad navigation graph to exit guide/control-group boundaries, preserving logical EPG rows and explicit select editing.
+- Add opt-in Jellyfin M3U and XMLTV feeds with matching stable channel IDs, via a separate authenticated read-only LAN port and current-source stream redirects.
+- Add a feed-only, non-root Dockerfile/Compose example, Unraid setup guidance, server-only mode, and separate Docker CI smoke test.
+- Tests: Go race/unit tests, Node navigation tests, mocked Chromium remote browser test, local feed authentication and isolation checks, Windows cross-build. Real device playback is not verified.
+
+
 ## v1.7.1 (17 November 2026)
 - Keep D-pad horizontal navigation within a single visible row and control group; programme-guide row boundaries no longer fall through to page-wide spatial navigation.
 - Require explicit OK-to-edit for Region/CC selectors; Up/Down changes a draft choice, OK commits, Back/Escape cancels without dispatching change.

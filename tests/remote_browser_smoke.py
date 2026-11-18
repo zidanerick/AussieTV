@@ -80,15 +80,29 @@ with sync_playwright() as pw:
  assert page.locator('#remoteHelpPanel').is_visible()
  page.locator('#remoteHelpClose').click()
  assert not page.locator('#remoteHelpPanel').is_visible()
- # Guide boundaries are hard edges: left/right cannot escape into the player.
+ # A remote must have an escape route from every visual section with D-pad only.
  first_channel=page.locator('#guide .channel-cell').first
  first_channel.focus()
  page.keyboard.press('ArrowLeft')
- assert page.evaluate('document.activeElement.classList.contains("channel-cell")')
- page.locator('#guide .show-cell').last.focus()
- focused_before=page.evaluate('document.activeElement.outerHTML')
+ assert page.evaluate('document.activeElement.closest("#filters") !== null')
  page.keyboard.press('ArrowRight')
- assert page.evaluate('document.activeElement.outerHTML')==focused_before
+ assert page.evaluate('document.activeElement.closest("#guide") !== null')
+ page.locator('#guide .show-cell').last.focus()
+ page.keyboard.press('ArrowRight')
+ assert page.evaluate('document.activeElement.closest(".guide-actions") !== null')
+ # Bottom of the guide exits to the guide controls instead of trapping focus.
+ page.locator('#guide .channel-cell').last.focus()
+ page.keyboard.press('ArrowDown')
+ assert page.evaluate('document.activeElement.closest(".guide-actions") !== null')
+ # The guide controls can be exited using D-pad to reach other sections.
+ page.keyboard.press('ArrowUp')
+ assert page.evaluate('document.activeElement.closest("#quickChannels") !== null')
+ page.keyboard.press('ArrowUp')
+ assert page.evaluate('document.activeElement.closest(".now-actions") !== null')
+ # Help and Text overlays stay dismissible with Back, without using Escape.
+ page.keyboard.press('h')
+ page.keyboard.press('Backspace')
+ assert not page.locator('#remoteHelpPanel').is_visible()
  # The player is its own horizontal control group.
  page.locator('#playPause').focus()
  page.keyboard.press('ArrowRight')
@@ -118,6 +132,6 @@ with sync_playwright() as pw:
  assert page.locator('#region').input_value()=='Sydney'
  page.locator('#guide .channel-cell').first.wait_for(timeout=20000)
  assert not errors, errors
- print('PASS: grid boundaries, strict player row, no accidental region changes, select edit/cancel/apply, existing remote features')
+ print('PASS: remote exits across sections, no focus traps, player row, region editing and existing controls')
  browser.close()
 server.shutdown()

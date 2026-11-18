@@ -1,7 +1,7 @@
 # AussieTV project continuity / future-chat handoff
 
 **Last documented:** 16 November 2026  
-**Current code:** v1.7.0 on `main`  
+**Current code:** v1.8.0 on `feature/v1.8-remote-jellyfin` (merge pending)  
 **Repository:** https://github.com/zidanerick/AussieTV
 
 ## User goal
@@ -124,3 +124,12 @@ Before each Windows build run `go run ./tools/iconbuilder`, which produces `rsrc
 - **Implementation:** `static/remote.js` restricts horizontal moves to the same visible row and local control group. A guide boundary does not fall through to global navigation. Region and CC selects have explicit OK-to-edit, up/down preview, OK-to-commit, Back/Escape cancel. `static/index.html` adds edit-state highlighting and UI help.
 - **Tests:** Go unit and race, Node remote unit, mocked Chromium at 1280x800 and 768x800, and Windows x64 cross-build passed locally. No real device or broadcaster playback test performed.
 - **Future:** Docker/Jellyfin server-mode work remains separate and must retain these remote-navigation semantics.
+
+
+## v1.8.0 (18 November 2026): deterministic remote exits and Jellyfin
+
+- Retain desktop loopback UI and launcher. D-pad navigation now has explicit cross-section routes between sidebar, player controls, now-playing actions, quick channels, guide actions, and the programme guide. Each row still uses program-aware movement. Browser tests verify escape routes, dropdown edit/cancel, playback controls and overlays without Escape-only traps.
+- A new **opt-in** Jellyfin feed listener serves only token-protected `/jellyfin/channels.m3u`, `/jellyfin/guide.xml`, `/jellyfin/stream/{id}` (redirect) and `/jellyfin/health`. No desktop APIs, HLS proxy, or unauthenticated UI are exposed on its port. `AUSSIETV_MODE=server` prevents desktop shutdown and heartbeat exit.
+- M3U tvg-id and XMLTV channel IDs match. Channels without valid public upstream links are excluded. Guide timestamps are UTC. Stream URLs redirect to upstream HLS sources: playback still depends on external stream restrictions.
+- New files: `jellyfin.go`, `jellyfin_test.go`, `Dockerfile`, `compose.yaml`, `docs/JELLYFIN.md`, `.github/workflows/docker-feed.yml`.
+- Evidence: local `go test -race ./...`, `node --test tests/remote_keys.test.cjs`, `python tests/remote_browser_smoke.py` (mock feed), Windows x64 Go build, and local feed isolation/authentication HTTP checks passed. Real Android/TV remote and Jellyfin playback, and Docker on Unraid, remain unverified.
