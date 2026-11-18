@@ -30,6 +30,8 @@ jobs:
         run: |
           $tag = (Get-Content RELEASE_VERSION -Raw).Trim()
           if ($tag -ne 'v0.1.0-beta.1') { throw "Unexpected release marker: $tag" }
+          go run ./tools/iconbuilder
+          if ($LASTEXITCODE -ne 0) { throw 'Icon asset generation failed' }
           go test ./... -count=1
           if ($LASTEXITCODE -ne 0) { throw 'Go tests failed' }
           node --test tests/remote_keys.test.cjs tests/settings_page.test.cjs tests/release_contract.test.cjs
