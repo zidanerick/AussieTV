@@ -84,7 +84,7 @@ wait for a PAT, video random-access signalling and audio; this is not a
 guarantee of decodability on all clients. No background prewarming, no
 re-encoding, and no relaxed upstream URL/authentication rules.
 
-Cold starts still pay FFmpeg input preparation costs. Compare cold and
+For simple master playlists that explicitly advertise H.264/AAC, fast tune selects one variant (highest advertised bandwidth up to 6 Mbit/s, or lowest compatible above that), retaining original audio rendition declarations. Unknown or malformed masters remain unchanged. This may reduce duplicate variant probes but can limit quality; it is deliberately restricted to fast-tune mode. Cold starts still pay FFmpeg input preparation costs. Compare cold and
 repeat tune times separately. Authenticated diagnostics include
 fastTuneSessionsStarted, fastTuneSessionReuses, fastTuneLagDrops,
 fast-tune-first-packet and fast-tune-cold/shared response timings.

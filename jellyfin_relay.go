@@ -247,6 +247,10 @@ func relayPlaylistOrSegment(w http.ResponseWriter, r *http.Request, cfg jellyfin
 			recordTune(ch.ID, mode, 415, time.Since(started), upstream)
 			return
 		}
+		if cfg.StreamMode == "fast-tune" {
+			// Rewriting/validation runs first; selection cannot bypass URL or DRM checks.
+			transformed = selectFastTuneVariant(transformed)
+		}
 		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusOK)
