@@ -108,7 +108,7 @@ func m3uFeed(channels []Channel, cfg jellyfinConfig) string {
 			logo = singleLine(jellyfinLogoURL(ch,cfg))
 		}
 		fmt.Fprintf(&w, "#EXTINF:-1 tvg-id=\"%s\" tvg-name=\"%s\" tvg-chno=\"%s\" tvg-logo=\"%s\" group-title=\"%s\",%s\n",
-			singleLine(id), singleLine(ch.Name), singleLine(ch.Number), logo, singleLine(ch.Network), singleLine(ch.Name))
+			singleLine(id), singleLine(ch.Name), singleLine(ch.Number), logo, singleLine(channelGroup(ch)), singleLine(ch.Name))
 		ext := ".m3u8"
 		if usesMPEGTS(cfg.StreamMode) {
 			ext = ".ts"
@@ -269,7 +269,7 @@ func newJellyfinHandlerWithPool(cfg jellyfinConfig, load func(string) ChannelDat
 					serveJellyfinMPEGTS(w, r, cfg, ch)
 					return
 				}
-				if effectiveStreamMode(cfg.StreamMode) == "relay" || installedProviders.IDs[ch.ID] {
+				if effectiveStreamMode(cfg.StreamMode) == "relay" || requiresGuardedRelay(ch) {
 					relayPlaylistOrSegment(w, r, cfg, ch, ch.Stream)
 					return
 				}
@@ -308,7 +308,7 @@ func newJellyfinHandlerWithPool(cfg jellyfinConfig, load func(string) ChannelDat
 	})
 	mediaHandler := func(w http.ResponseWriter, r *http.Request) {
 		id, err := base64.RawURLEncoding.DecodeString(r.PathValue("id"))
-		if err != nil || len(id) == 0 || len(id) > 512 || (effectiveStreamMode(cfg.StreamMode) != "relay" && !usesMPEGTS(cfg.StreamMode) && !installedProviders.IDs[string(id)]) {
+		if err != nil || len(id) == 0 || len(id) > 512 {
 			http.NotFound(w, r)
 			return
 		}
@@ -317,6 +317,7 @@ func newJellyfinHandlerWithPool(cfg jellyfinConfig, load func(string) ChannelDat
 			if ch.ID != string(id) {
 				continue
 			}
+			if effectiveStreamMode(cfg.StreamMode)!="relay" && !usesMPEGTS(cfg.StreamMode) && !requiresGuardedRelay(ch) {http.NotFound(w,r);return}
 			if _, err := validateRemote(remote); err != nil || !permittedStream(ch, remote, r.URL.Query().Get("sig")) {
 				http.Error(w, "Unauthorised media resource", http.StatusForbidden)
 				return

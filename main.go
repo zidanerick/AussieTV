@@ -56,6 +56,7 @@ type Channel struct {
 	Name     string            `json:"name"`
 	Number   string            `json:"number"`
 	Network  string            `json:"network"`
+	Category string            `json:"category,omitempty"`
 	Logo     string            `json:"logo,omitempty"`
 	Stream   string            `json:"stream,omitempty"`
 	Headers  map[string]string `json:"headers,omitempty"`
@@ -79,8 +80,44 @@ var curated = []struct{ net, name, number string }{
 }
 // Selected candidates are opt-in, use the existing index and never bypass DRM.
 var extraAustralian = []struct{ net, name, number string }{
-	{"Nine","9Rush","95"},{"Community","Channel 31","44"},
-	{"Seven","Mythbusters","1100"},{"Seven","Air Crash Investigations","1101"},{"Seven","Mighty Machines","1102"},{"Nine","BBC Top Gear","1103"},{"Nine","Seinfeld","1104"},
+	{"Nine", "9Rush", "95"},
+	{"Community", "Channel 31", "44"},
+	{"", "GOOD.", "1000"},
+	{"Ten", "YouTV", "1001"},
+	{"", "BBC News", "1200"},
+	{"Sky", "Sky News Now", "1201"},
+	{"", "Al Jazeera", "1202"},
+	{"", "DW English", "1203"},
+	{"SBS", "France 24", "1204"},
+	{"", "Channel News Asia (CNA)", "1205"},
+	{"SBS", "euronews", "1206"},
+	{"", "Bloomberg TV", "1207"},
+	{"Seven", "ausbiz", "1208"},
+	{"Seven", "7AFL", "1300"},
+	{"Ten", "10 Sport 2", "1301"},
+	{"SBS", "FIFA+", "1302"},
+	{"Seven", "Cricket Gold", "1303"},
+	{"", "Redbull TV", "1304"},
+	{"Seven", "Racing.com", "1305"},
+	{"Seven", "Hockey One", "1306"},
+	{"Nine", "WNBL 2026/27", "1307"},
+	{"Ten", "Wildest", "1400"},
+	{"Nine", "H2", "1401"},
+	{"Ten", "History & Warfare", "1402"},
+	{"Ten", "True Stories", "1403"},
+	{"Seven", "Travel Australia", "1404"},
+	{"Nine", "BBC Comedy", "1500"},
+	{"Ten", "Sitcom Central", "1501"},
+	{"Ten", "Adult Animation", "1502"},
+	{"Nine", "9Crime", "1503"},
+	{"Nine", "9Mystery&Paranormal", "1504"},
+	{"Ten", "Crime Time", "1505"},
+	{"Seven", "True Crime Files", "1506"},
+	{"Seven", "All-Star Cinema", "1507"},
+	{"Ten", "Moviesphere", "1508"},
+	{"Nine", "BBC Food", "1509"},
+	{"Nine", "BBC Home & Garden", "1510"},
+	{"Ten", "NickToons", "1511"},
 }
 var extraAustralianEnabled bool
 func activeCurated() []struct{net,name,number string} {
@@ -488,12 +525,22 @@ func fetchChannels(region string, old cacheEntry, hasOld bool) ChannelData {
 		return old.data
 	}
 	if offline, loaderr := loadOffline(region); loaderr == nil {
-		// Do not retain previously enabled experimental channels when disabled.
-		if !extraAustralianEnabled {
-			filtered:=make([]Channel,0,len(offline.Channels))
-			for _,ch:=range offline.Channels {for _,spec:=range curated {if ch.Name==spec.name&&ch.Network==spec.net&&ch.Number==spec.number{filtered=append(filtered,ch);break}}}
-			offline.Channels=filtered
+		// Never resurrect old single-show entries or disabled expansion from disk.
+		filtered:=make([]Channel,0,len(offline.Channels))
+		for _,ch:=range offline.Channels {
+			for _,spec:=range activeCurated() {
+				if ch.Name==spec.name && ch.Number==spec.number && (ch.Network==spec.net || (spec.net=="" && ch.Network=="International")) {
+					if category:=expandedCategory(ch);category!="" {
+						if !providerURL(ch.Stream,true) {break}
+						ch.Category=category
+						ch.Headers=nil
+						if ch.Network=="" {ch.Network="International"}
+					}
+					filtered=append(filtered,ch);break
+				}
+			}
 		}
+		offline.Channels=filtered
 		offline.Warning = "Guide offline; displaying last saved channel data."
 		return offline
 	}
@@ -549,16 +596,21 @@ func makeData(entries map[string]Entry, region string) ChannelData {
 		var entry Entry
 		for k, e := range entries {
 			if e.Network == spec.net && e.Name == spec.name {
-				id = k
-				entry = e
-				break
+				// Exact match only; use stable ordering if the index contains duplicates.
+				if id == "" || k < id { id = k; entry = e }
 			}
 		}
 		if id == "" {
 			continue
 		}
 		ch := Channel{ID: id, Name: entry.Name, Number: spec.number, Network: entry.Network, Logo: entry.Logo, Stream: entry.Master, Headers: providerHeaders(entry.Headers), Official: official[spec.net], Programs: []Program{}}
-		for _,extra:=range extraAustralian {if extra.net==spec.net&&extra.name==spec.name{ch.Headers=nil;break}}
+		if category := expandedCategory(ch); category != "" {
+			// No provider-supplied device impersonation headers or credentials.
+			if !providerURL(ch.Stream,true) {continue}
+			ch.Headers=nil
+			ch.Category=category
+			if ch.Network=="" {ch.Network="International"}
+		}
 		var points []Program
 		for _, p := range entry.Programs {
 			if len(p) < 2 {
@@ -585,7 +637,7 @@ func makeData(entries map[string]Entry, region string) ChannelData {
 }
 func fallback(region string) ChannelData {
 	data := ChannelData{Region: region, Updated: "", Source: "Offline fallback", Channels: []Channel{}}
-	for _, c := range activeCurated() {
+	for _, c := range curated {
 		data.Channels = append(data.Channels, Channel{ID: "fallback-" + strings.ReplaceAll(strings.ToLower(c.net+"-"+c.name), " ", "-"), Name: c.name, Number: c.number, Network: c.net, Official: official[c.net], Programs: []Program{}})
 	}
 	return data

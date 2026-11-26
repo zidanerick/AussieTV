@@ -64,7 +64,7 @@ Download tested archives from [GitHub Actions](https://github.com/zidanerick/Aus
 
 ## Experimental provider manager
 
-Optional administrator-configured M3U/XMLTV sources extend the existing regional lineup. See [provider setup](docs/PROVIDERS.md). Extra providers are disabled by default.
+Optional administrator-configured M3U/XMLTV sources extend the existing regional lineup. See [provider setup](docs/PROVIDERS.md). Extra providers are disabled by default. Enable the [Round 2 expanded lineup](docs/LINEUP.md) with AUSSIETV_EXTRA_AU_CHANNELS=1.
 
 ## Data providers and privacy
 

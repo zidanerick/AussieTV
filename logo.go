@@ -42,7 +42,7 @@ func logoChannelAllowed(c Channel) bool {
 	if ch,ok:=externalProviderChannel(c.ID);ok{return ch.Logo==c.Logo && ch.Name==c.Name && ch.Number==c.Number}
 
 	for _, spec := range activeCurated() {
-		if c.Network == spec.net && c.Name == spec.name && c.Number == spec.number {
+		if (c.Network == spec.net || (spec.net=="" && c.Network=="International")) && c.Name == spec.name && c.Number == spec.number {
 			return true
 		}
 	}
