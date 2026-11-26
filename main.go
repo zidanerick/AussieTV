@@ -184,6 +184,7 @@ var uriRegexp = regexp.MustCompile(`URI="([^"]+)"`)
 // An approximate/ambiguous result is intentionally treated as no artwork.
 type Artwork struct {
 	Poster string `json:"poster,omitempty"`
+	Backdrop string `json:"backdrop,omitempty"`
 	Credit string `json:"credit,omitempty"`
 	Page   string `json:"page,omitempty"`
 }
@@ -234,7 +235,7 @@ func lookupArtwork(title string) Artwork {
 		return empty
 	}
 	req.Header.Set("User-Agent", "AussieTV/0.1.0-beta.1 (TVmaze artwork attribution)")
-	response, err := artworkClient.Do(req)
+	response, err := pacedArtworkRequest(req)
 	if err != nil {
 		log.Printf("programme art lookup: %v", err)
 		return empty
@@ -245,6 +246,7 @@ func lookupArtwork(title string) Artwork {
 	}
 	var candidates []struct {
 		Show struct {
+			ID int `json:"id"`
 			Name  string `json:"name"`
 			URL   string `json:"url"`
 			Image struct {
@@ -257,6 +259,7 @@ func lookupArtwork(title string) Artwork {
 		return empty
 	}
 	var match *Artwork
+	var showID int
 	for _, candidate := range candidates {
 		show := candidate.Show
 		if canonicalTitle(show.Name) != canonicalTitle(title) {
@@ -278,9 +281,13 @@ func lookupArtwork(title string) Artwork {
 			}
 		}
 		match = &art
+		showID = show.ID
 	}
 	if match == nil {
 		return empty
+	}
+	if showID > 0 && match.Poster != "" {
+		match.Backdrop = lookupArtworkBackdrop(showID)
 	}
 	return *match
 }
@@ -324,8 +331,7 @@ func cachedProgrammeArtwork(title string) (string, bool) {
 
 func scheduleProgrammeArtwork(channels []Channel) {
 	seen := make(map[string]bool)
-	for _, ch := range channels {
-		for _, programme := range ch.Programs {
+	for _, programme := range prioritizedArtworkProgrammes(channels) {
 			clean := artworkTitle(programme.Title)
 			if clean == "" {
 				continue
@@ -350,21 +356,16 @@ func scheduleProgrammeArtwork(channels []Channel) {
 				delete(artworkBackground.pending, key)
 			}
 			artworkBackground.Unlock()
-		}
 	}
 	artworkBackground.once.Do(func() {
-		throttle := time.NewTicker(700 * time.Millisecond)
-		for i := 0; i < 2; i++ {
+				for i := 0; i < 2; i++ {
 			go func() {
 				for title := range artworkBackground.queue {
-					<-throttle.C
 					key := canonicalTitle(title)
 					// A concurrent browser lookup might have populated it.
 					if _, exists := cachedProgrammeArtwork(title); !exists {
 						result := lookupArtwork(title)
-						artMu.Lock()
-						artCache[key] = artworkCacheEntry{Art: result, At: time.Now()}
-						artMu.Unlock()
+						storeArtworkCacheEntry(key, result)
 					}
 					artworkBackground.Lock()
 					delete(artworkBackground.pending, key)
@@ -409,9 +410,7 @@ func artworkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := lookupArtwork(title)
-	artMu.Lock()
-	artCache[key] = artworkCacheEntry{Art: result, At: time.Now()}
-	artMu.Unlock()
+	storeArtworkCacheEntry(key, result)
 	jsonResponse(w, result)
 }
 
@@ -905,6 +904,7 @@ func main() {
 		os.Exit(code)
 	}
 	prepareLogging()
+	initArtworkDiskCache()
 	if err := initTeletext(); err != nil {
 		log.Printf("Teletext unavailable: %v", err)
 	}
@@ -953,6 +953,11 @@ func main() {
 			// This is an optional network integration, never a fatal TV startup error.
 			log.Printf("Jellyfin feed unavailable (TV interface still starts): %v", err)
 		}
+	}
+	if serverMode && envEnabled {
+		warmCtx, stopWarm := context.WithCancel(context.Background())
+		defer stopWarm()
+		go warmProgrammeArtwork(warmCtx, feedCfg.Region)
 	}
 	log.Printf("AussieTV v%s starting on %s/%s", version, runtime.GOOS, runtime.GOARCH)
 	mux := http.NewServeMux()

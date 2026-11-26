@@ -25,9 +25,7 @@ Add an **XMLTV guide provider** using:
 http://YOUR-AUSSIETV-PC:45782/jellyfin/guide.xml?key=YOUR_KEY
 ```
 
-Use the same region in both feeds. Channel IDs and guide IDs match. Cached
-programme posters are exported where TVmaze has an unambiguous title match;
-Jellyfin clients do not always import programme icons as Primary artwork.
+Use the same region in both feeds. Channel IDs and guide IDs match. Programme posters use the same exact-title TVmaze matching as the web app. Server mode warms upcoming programme metadata in the background and persists a bounded cache in /data/AussieTV/programme-artwork.json (Docker). XMLTV exports legacy icon and typed poster, plus a genuine landscape backdrop when available. Curated channel logos use the same bounded image endpoint as the web player, with authenticated feed URLs. Jellyfin clients do not always import programme icons as Primary artwork.
 The bearer key is embedded in both URLs and must be kept private.
 
 ## Stream transport modes
@@ -89,3 +87,7 @@ repeat tune times separately. Authenticated diagnostics include
 fastTuneSessionsStarted, fastTuneSessionReuses, fastTuneLagDrops,
 fast-tune-first-packet and fast-tune-cold/shared response timings.
 These do not measure Jellyfin's own click-to-first-picture latency.
+
+## Artwork troubleshooting
+
+After updating, keep the same M3U/XMLTV URLs and run Jellyfin Refresh Guide Data after the artwork queue has populated. Check the authenticated diagnostics for programmeArtworkCached, programmeArtworkMisses and programmeArtworkPending. The guide request never blocks on TVmaze; a cold installation may need a later refresh. The cache persists if /data is mounted. Ambiguous titles, bulletins and programmes with no matching artwork deliberately remain blank. TVmaze landscape images are series backdrops, not episode stills. Jellyfin 12 imports typed backdrop art, but upstream [issue #18209](https://github.com/jellyfin/jellyfin/issues/18209) tracks missing Primary artwork from XMLTV icons. This change cannot guarantee a particular Jellyfin client displays images. Do not clear the entire Jellyfin database to refresh artwork.

@@ -92,6 +92,12 @@ func singleLine(value string) string {
 	}, value)
 }
 func xmltvTime(sec int64) string { return time.Unix(sec, 0).UTC().Format("20060102150405 -0000") }
+func jellyfinLogoURL(ch Channel,cfg jellyfinConfig) string {
+	if _,err:=realLogoURL(ch);err==nil {
+		return cfg.BaseURL+"/jellyfin/logo/"+base64.RawURLEncoding.EncodeToString([]byte(ch.ID))+"?key="+url.QueryEscape(cfg.Key)
+	}
+	return ch.Logo
+}
 func m3uFeed(channels []Channel, cfg jellyfinConfig) string {
 	var w strings.Builder
 	w.WriteString("#EXTM3U\n")
@@ -99,7 +105,7 @@ func m3uFeed(channels []Channel, cfg jellyfinConfig) string {
 		id := xmlTVID(cfg.Region, ch)
 		logo := ""
 		if _, err := validateRemote(ch.Logo); err == nil {
-			logo = singleLine(ch.Logo)
+			logo = singleLine(jellyfinLogoURL(ch,cfg))
 		}
 		fmt.Fprintf(&w, "#EXTINF:-1 tvg-id=\"%s\" tvg-name=\"%s\" tvg-chno=\"%s\" tvg-logo=\"%s\" group-title=\"%s\",%s\n",
 			singleLine(id), singleLine(ch.Name), singleLine(ch.Number), logo, singleLine(ch.Network), singleLine(ch.Name))
@@ -127,12 +133,19 @@ type xmltvChannel struct {
 	Names []xmltvName `xml:"display-name"`
 	Icon  *xmltvIcon  `xml:"icon,omitempty"`
 }
+type xmltvImage struct {
+	Type string `xml:"type,attr"`
+	Orient string `xml:"orient,attr,omitempty"`
+	System string `xml:"system,attr,omitempty"`
+	URL string `xml:",chardata"`
+}
 type xmltvProgramme struct {
 	Start   string     `xml:"start,attr"`
 	Stop    string     `xml:"stop,attr"`
 	Channel string     `xml:"channel,attr"`
 	Title   xmltvName  `xml:"title"`
 	Icon    *xmltvIcon `xml:"icon,omitempty"`
+	Images []xmltvImage `xml:"image,omitempty"`
 }
 type xmltvDocument struct {
 	XMLName    xml.Name         `xml:"tv"`
@@ -142,12 +155,17 @@ type xmltvDocument struct {
 }
 
 func xmltvFeed(channels []Channel, region string) ([]byte, error) {
+	return xmltvFeedWithConfig(channels,region,nil)
+}
+func xmltvFeedWithConfig(channels []Channel, region string,cfg *jellyfinConfig) ([]byte, error) {
 	doc := xmltvDocument{Generator: "AussieTV", Channels: []xmltvChannel{}, Programmes: []xmltvProgramme{}}
 	for _, ch := range channels {
 		id := xmlTVID(region, ch)
 		row := xmltvChannel{ID: id, Names: []xmltvName{{Value: ch.Name}, {Value: ch.Number}}}
 		if _, err := validateRemote(ch.Logo); err == nil {
-			row.Icon = &xmltvIcon{Src: ch.Logo}
+			logo:=ch.Logo
+			if cfg!=nil {logo=jellyfinLogoURL(ch,*cfg)}
+			row.Icon = &xmltvIcon{Src: logo}
 		}
 		doc.Channels = append(doc.Channels, row)
 		for _, p := range ch.Programs {
@@ -155,8 +173,10 @@ func xmltvFeed(channels []Channel, region string) ([]byte, error) {
 				continue
 			}
 			row := xmltvProgramme{Start: xmltvTime(p.Start), Stop: xmltvTime(p.End), Channel: id, Title: xmltvName{Lang: "en", Value: p.Title}}
-			if image, found := cachedProgrammeArtwork(p.Title); found && image != "" {
-				row.Icon = &xmltvIcon{Src: image}
+			if art,found:=cachedProgrammeImages(p.Title);found && art.Poster!="" {
+				row.Icon=&xmltvIcon{Src:art.Poster}
+				row.Images=append(row.Images,xmltvImage{Type:"poster",Orient:"P",System:"tvmaze",URL:art.Poster})
+				if art.Backdrop!="" {row.Images=append(row.Images,xmltvImage{Type:"backdrop",Orient:"L",System:"tvmaze",URL:art.Backdrop})}
 			}
 			doc.Programmes = append(doc.Programmes, row)
 		}
@@ -197,9 +217,17 @@ func newJellyfinHandlerWithPool(cfg jellyfinConfig, load func(string) ChannelDat
 		w.Header().Set("Content-Type", "audio/x-mpegurl; charset=utf-8")
 		_, _ = io.WriteString(w, m3uFeed(feedChannels(load(cfg.Region)), cfg))
 	})
+	mux.HandleFunc("GET /jellyfin/logo/{id}",func(w http.ResponseWriter,r *http.Request){
+		id,err:=base64.RawURLEncoding.DecodeString(r.PathValue("id"))
+		if err!=nil || len(id)==0 || len(id)>512 {http.NotFound(w,r);return}
+		for _,ch:=range feedChannels(load(cfg.Region)) {
+			if ch.ID==string(id) {serveRealLogo(w,r,ch);return}
+		}
+		http.NotFound(w,r)
+	})
 	mux.HandleFunc("GET /jellyfin/guide.xml", func(w http.ResponseWriter, r *http.Request) {
 		channels := feedChannels(load(cfg.Region))
-		content, err := xmltvFeed(channels, cfg.Region)
+		content, err := xmltvFeedWithConfig(channels, cfg.Region,&cfg)
 		if err != nil {
 			http.Error(w, "guide encoding error", http.StatusInternalServerError)
 			return
