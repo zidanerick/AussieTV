@@ -143,6 +143,7 @@ func mpegTSFFmpegArgs(source string) []string {
 	// Preserve source codecs and audio timestamps without re-encoding.
 	return []string{
 		"-hide_banner", "-loglevel", "error", "-nostdin",
+		"-protocol_whitelist", "http,https,tcp,tls,crypto",
 		"-rw_timeout", "12000000", "-analyzeduration", "3000000", "-probesize", "2097152",
 		"-i", source,
 		"-map", "0:v:0", "-map", "0:a:0", "-c:v", "copy", "-c:a", "copy",

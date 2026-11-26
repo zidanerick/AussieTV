@@ -488,6 +488,12 @@ func fetchChannels(region string, old cacheEntry, hasOld bool) ChannelData {
 		return old.data
 	}
 	if offline, loaderr := loadOffline(region); loaderr == nil {
+		// Do not retain previously enabled experimental channels when disabled.
+		if !extraAustralianEnabled {
+			filtered:=make([]Channel,0,len(offline.Channels))
+			for _,ch:=range offline.Channels {for _,spec:=range curated {if ch.Name==spec.name&&ch.Network==spec.net&&ch.Number==spec.number{filtered=append(filtered,ch);break}}}
+			offline.Channels=filtered
+		}
 		offline.Warning = "Guide offline; displaying last saved channel data."
 		return offline
 	}

@@ -104,6 +104,10 @@ func rewriteRelayPlaylist(body []byte, base *url.URL, cfg jellyfinConfig, chID s
 	lines := strings.Split(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n")
 	for i, item := range lines {
 		item = strings.TrimSpace(item)
+		// Reject indirect fetch/control tags not handled by this relay.
+		if strings.HasPrefix(item,"#EXT-X-CONTENT-STEERING") || strings.HasPrefix(item,"#EXT-X-DEFINE") || strings.HasPrefix(item,"#EXT-X-SESSION-DATA") || (strings.HasPrefix(item,"#") && strings.Contains(item,"URI=") && !strings.Contains(item,`URI="`)) {
+			return nil,errors.New("unsupported HLS indirect resource directive")
+		}
 		if strings.HasPrefix(item, "#EXT-X-KEY") || strings.HasPrefix(item, "#EXT-X-SESSION-KEY") {
 			if strings.Contains(item, "KEYFORMAT=") || strings.Contains(item, "METHOD=SAMPLE-AES") {
 				return nil, errors.New("protected HLS playlist is not supported")
