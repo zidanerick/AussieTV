@@ -1,4 +1,4 @@
-# Multi-architecture experimental server. Feed-only by default; web UI opt-in.
+# Multi-architecture experimental server. Both listeners require explicit configuration.
 FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
 ARG TARGETOS
 ARG TARGETARCH
@@ -18,7 +18,7 @@ LABEL org.opencontainers.image.source="https://github.com/zidanerick/AussieTV"
 USER 10001:10001
 ENV XDG_CACHE_HOME=/data \
     AUSSIETV_MODE=server \
-    AUSSIETV_JELLYFIN_BIND=0.0.0.0:45782 \
+    AUSSIETV_JELLYFIN_BIND= \
     AUSSIETV_JELLYFIN_REGION=Melbourne
 WORKDIR /data
 EXPOSE 45781 45782

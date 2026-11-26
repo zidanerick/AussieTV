@@ -9,7 +9,7 @@ services:
         max-size: '10m'
         max-file: '3'
     ports:
-      - "45782:45782"
+      - "${AUSSIETV_FEED_HOST_BIND:-127.0.0.1}:45782:45782"
     environment:
       AUSSIETV_MODE: server
       AUSSIETV_JELLYFIN_BIND: 0.0.0.0:45782

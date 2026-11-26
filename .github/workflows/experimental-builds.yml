@@ -27,6 +27,7 @@ jobs:
           go run ./tools/iconbuilder
           go test ./... -count=1
           go vet ./...
+          python3 -m unittest discover -s tests -p 'test_unraid_template.py'
           node --test tests/*.test.cjs
           bash tools/build-linux.sh amd64
           bash tools/build-linux.sh arm64
@@ -73,7 +74,7 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Build image
-        run: docker buildx build --platform linux/${{ matrix.arch }} --load -t aussietv:ci .
+        run: docker buildx build --platform linux/${{ matrix.arch }} --label "org.opencontainers.image.revision=$GITHUB_SHA" --load -t aussietv:ci .
       - name: Test authenticated web UI and feed-only modes
         shell: bash
         run: |
@@ -95,7 +96,7 @@ jobs:
           test "$(curl -s -u viewer:ci-test-password-1234567890 -H 'Origin: https://evil.invalid' -o /dev/null -w '%{http_code}' http://127.0.0.1:45781/)" = 403
           test "$(curl -s -u viewer:ci-test-password-1234567890 -X POST -o /dev/null -w '%{http_code}' http://127.0.0.1:45781/api/quit)" = 405
           curl -fsS -u viewer:ci-test-password-1234567890 http://127.0.0.1:45781/favicon-192.png >/dev/null
-          docker run -d --name tv-feed --platform linux/${{ matrix.arch }} --read-only --cap-drop ALL --security-opt no-new-privileges -p 127.0.0.1:45782:45782 -e AUSSIETV_JELLYFIN_KEY=ci-feed-key-1234567890123456 -e AUSSIETV_JELLYFIN_BASE_URL=http://127.0.0.1:45782 aussietv:ci
+          docker run -d --name tv-feed --platform linux/${{ matrix.arch }} --read-only --cap-drop ALL --security-opt no-new-privileges -p 127.0.0.1:45782:45782 -e AUSSIETV_JELLYFIN_BIND=0.0.0.0:45782 -e AUSSIETV_JELLYFIN_KEY=ci-feed-key-1234567890123456 -e AUSSIETV_JELLYFIN_BASE_URL=http://127.0.0.1:45782 aussietv:ci
           for i in {1..60}; do
             if curl -fsS 'http://127.0.0.1:45782/jellyfin/health?key=ci-feed-key-1234567890123456' > /tmp/feed-health; then break; fi
             sleep 1
@@ -137,7 +138,7 @@ jobs:
           retention-days: 90
 
   publish-docker:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'zidanerick/AussieTV'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/experimental/linux-discord-builds') && github.repository == 'zidanerick/AussieTV'
     needs: [linux, docker]
     runs-on: ubuntu-latest
     permissions:
@@ -170,8 +171,14 @@ jobs:
             docker push "$repo:sha-$GITHUB_SHA-$arch"
             docker image rm aussietv:ci
           done
+          # The PR branch can publish a separate preview, never the main beta tag.
+          if [ "$GITHUB_REF" = refs/heads/main ]; then
+            channel="experimental-$tag"
+          else
+            channel="docker-preview"
+          fi
           docker buildx imagetools create \
             -t "$repo:sha-$GITHUB_SHA" \
-            -t "$repo:experimental-$tag" \
+            -t "$repo:$channel" \
             "$repo:sha-$GITHUB_SHA-amd64" "$repo:sha-$GITHUB_SHA-arm64"
           docker buildx imagetools inspect "$repo:sha-$GITHUB_SHA"

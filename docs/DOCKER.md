@@ -7,8 +7,7 @@ accordingly. No privileged mode or host networking is required.
 
 After the experimental workflow passes on main, it publishes the tested images (not a rebuild) as
 `ghcr.io/zidanerick/aussietv:experimental-v0.1.0-beta.1` and a commit SHA tag.
-The repository owner may need to make the GHCR package public. PR builds
-instead provide architecture-specific docker save archives. Extract the
+The repository owner may need to make the GHCR package public. The trusted Docker development branch also publishes a separate `docker-preview` tag after tests pass; it never changes the main beta tag. All builds provide architecture-specific docker save archives. Extract the
 Actions artifact ZIP, verify SHA256SUMS, then `docker load -i <archive.tar.gz>`;
 the local loaded tag is `aussietv:ci`.
 
@@ -40,6 +39,9 @@ endpoints are exposed. Real playback, subtitles and remote input still
 require testing. This is not a stable multi-user server.
 
 ## Unraid deployment
+
+A manual Unraid v2 template is provided at [unraid/AussieTV.xml](../unraid/AussieTV.xml). It is not submitted to Community Applications and has not been imported on a real Unraid host yet. It requires an explicit HTTPS browser origin and a unique password; Jellyfin is opt-in. For the preview registry image, replace the template Repository field with `ghcr.io/zidanerick/aussietv:docker-preview` after a successful publish. The template deliberately leaves WebUI blank; set the correct HTTPS URL in Advanced View. Before starting, create and permission the appdata directory as below. Review the published port and restrict access to the HTTPS proxy.
+
 
 Use Add Container in the Docker tab (Advanced View if necessary). For the
 current CI artifact, load the amd64 image first and set Repository to
@@ -102,7 +104,7 @@ not stop the server. SIGTERM initiates a bounded shutdown.
 
 ## Jellyfin-only (original mode)
 
-Use compose.yaml with the required BASE_URL and KEY variables (the file now pulls the image instead of implicitly rebuilding):
+Use compose.yaml with the required BASE_URL and KEY variables (the file now pulls the image instead of implicitly rebuilding). Both listeners now require explicit bind settings, so raw docker run users must set AUSSIETV_JELLYFIN_BIND=0.0.0.0:45782 when enabling the feed. Compose already sets it. The published feed port defaults to host loopback; set AUSSIETV_FEED_HOST_BIND to a private address reachable by Jellyfin when needed.
 
     export AUSSIETV_JELLYFIN_BASE_URL=http://YOUR_SERVER_IP:45782
     export AUSSIETV_JELLYFIN_KEY="$(openssl rand -hex 24)"
