@@ -2,7 +2,7 @@
 
 The Australian regional lineup remains unchanged. Extra providers are disabled
 by default; enable only sources you have permission to play in third-party
-clients. No FAST service is integrated or claimed working yet.
+clients. No full FAST service is integrated or claimed working yet. Set AUSSIETV_EXTRA_AU_CHANNELS=1 to opt into seven candidates from the existing regional index: 9Rush, Channel 31, Mythbusters, Air Crash Investigations, Mighty Machines, BBC Top Gear and Seinfeld. Only matching entries appear; no real playback verification yet. New entries do not use provider-supplied client impersonation headers. The list is experimental and must not be used to bypass access restrictions.
 
 ## Docker / Unraid
 
@@ -21,7 +21,7 @@ Example M3U (reserved placeholder domain, not a real stream):
 Each source needs a unique stable tvg-id. The XMLTV programme channel
 attribute must match it; use timestamps with explicit UTC offsets. The
 provider manager assigns stable namespaced IDs and numbers beginning at
-numberStart (1000-9899), preserving all Australian IDs. Omit xmltv if no
+numberStart (1000-9899, excluding reserved Australian/experimental numbers), preserving all Australian IDs. Omit xmltv if no
 authorised schedule is available. Missing guides stay empty, not fabricated.
 Import changes require a restart and Jellyfin guide refresh.
 

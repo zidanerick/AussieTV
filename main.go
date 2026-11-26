@@ -77,6 +77,16 @@ var curated = []struct{ net, name, number string }{
 	{"Nine", "Channel 9", "9"}, {"Nine", "9Gem", "92"}, {"Nine", "9Go!", "93"}, {"Nine", "9Life", "94"},
 	{"Ten", "10", "10"}, {"Ten", "10 Drama", "12"}, {"Ten", "10 Comedy", "11"}, {"Ten", "Nickelodeon", "13"},
 }
+// Selected candidates are opt-in, use the existing index and never bypass DRM.
+var extraAustralian = []struct{ net, name, number string }{
+	{"Nine","9Rush","95"},{"Community","Channel 31","44"},
+	{"Seven","Mythbusters","1100"},{"Seven","Air Crash Investigations","1101"},{"Seven","Mighty Machines","1102"},{"Nine","BBC Top Gear","1103"},{"Nine","Seinfeld","1104"},
+}
+var extraAustralianEnabled bool
+func activeCurated() []struct{net,name,number string} {
+	if !extraAustralianEnabled {return curated}
+	return append(append([]struct{net,name,number string}{},curated...),extraAustralian...)
+}
 var regionAllowed = map[string]bool{"Melbourne": true, "Sydney": true, "Brisbane": true, "Adelaide": true, "Perth": true, "Hobart": true, "Canberra": true, "Darwin": true}
 var official = map[string]string{
 	"ABC":   "https://iview.abc.net.au/collection/959",
@@ -84,6 +94,7 @@ var official = map[string]string{
 	"Seven": "https://7plus.com.au/live-tv",
 	"Nine":  "https://www.9now.com.au/live/channel-9",
 	"Ten":   "https://10.com.au/live",
+	"Community": "https://www.c31.org.au/",
 }
 var client = &http.Client{Timeout: 24 * time.Second, Transport: &http.Transport{
 	Proxy: http.ProxyFromEnvironment, MaxIdleConns: 50, MaxIdleConnsPerHost: 12, IdleConnTimeout: 65 * time.Second,
@@ -527,7 +538,7 @@ func setProviderRequestHeaders(req *http.Request, ch Channel) {
 
 func makeData(entries map[string]Entry, region string) ChannelData {
 	result := ChannelData{Region: region, Updated: time.Now().Format(time.RFC3339), Source: sourceBase + region + "/tv.json", Channels: []Channel{}}
-	for _, spec := range curated {
+	for _, spec := range activeCurated() {
 		var id string
 		var entry Entry
 		for k, e := range entries {
@@ -541,6 +552,7 @@ func makeData(entries map[string]Entry, region string) ChannelData {
 			continue
 		}
 		ch := Channel{ID: id, Name: entry.Name, Number: spec.number, Network: entry.Network, Logo: entry.Logo, Stream: entry.Master, Headers: providerHeaders(entry.Headers), Official: official[spec.net], Programs: []Program{}}
+		for _,extra:=range extraAustralian {if extra.net==spec.net&&extra.name==spec.name{ch.Headers=nil;break}}
 		var points []Program
 		for _, p := range entry.Programs {
 			if len(p) < 2 {
@@ -567,7 +579,7 @@ func makeData(entries map[string]Entry, region string) ChannelData {
 }
 func fallback(region string) ChannelData {
 	data := ChannelData{Region: region, Updated: "", Source: "Offline fallback", Channels: []Channel{}}
-	for _, c := range curated {
+	for _, c := range activeCurated() {
 		data.Channels = append(data.Channels, Channel{ID: "fallback-" + strings.ReplaceAll(strings.ToLower(c.net+"-"+c.name), " ", "-"), Name: c.name, Number: c.number, Network: c.net, Official: official[c.net], Programs: []Program{}})
 	}
 	return data
@@ -911,6 +923,7 @@ func main() {
 	}
 	prepareLogging()
 	initArtworkDiskCache()
+	extraAustralianEnabled=os.Getenv("AUSSIETV_EXTRA_AU_CHANNELS")=="1"
 	if providers,err:=loadProviderSet(os.Getenv("AUSSIETV_PROVIDERS_FILE"));err!=nil{
 		log.Printf("Additional providers disabled: %v",err)
 	}else{installedProviders=providers;if len(providers.Channels)>0{log.Printf("Loaded %d additional channels",len(providers.Channels))}}

@@ -172,9 +172,10 @@ func loadProviderSet(path string)(providerSet,error){
 	if d.Decode(new(any))!=io.EOF{return out,errors.New("trailing provider manifest content")}
 	seen:=map[string]bool{}
 	numbers:=map[string]bool{}
+	for _,spec:=range activeCurated(){numbers[spec.number]=true}
 	for _,s:=range manifest.Providers{
 		if !s.Enabled{continue}
-		if !providerID.MatchString(s.ID)||seen[s.ID]||!providerText(s.Name,64)||s.NumberStart<1000||s.NumberStart>9899{return providerSet{},errors.New("invalid provider ID, name or numbering")}
+		if !providerID.MatchString(s.ID)||seen[s.ID]||!providerText(s.Name,64)||s.Name=="All"||s.Name=="Favourites"||s.NumberStart<1000||s.NumberStart>9899{return providerSet{},errors.New("invalid provider ID, name or numbering")}
 		seen[s.ID]=true
 		p,err:=providerFile(filepath.Dir(path),s.M3U);if err!=nil{return providerSet{},err}
 		data,err:=readProviderFile(p,1<<20);if err!=nil{return providerSet{},err}
