@@ -1,25 +1,13 @@
-# Integration roadmap after the first Windows beta
+# Docker integration roadmap
 
-**Windows-only, `v0.1.0-beta.1`.** The next release milestone is reliability,
-not platform expansion. Current optional integrations:
+Active: authenticated Jellyfin M3U/XMLTV, guarded HLS relay, experimental
+MPEG-TS/Fast Tune, optional artwork repair, regional and selected expanded
+channels, readiness-gated public broadcaster candidates, local provider
+manifest and Teletext pages/video. See [Jellyfin](JELLYFIN.md),
+[provider setup](PROVIDERS.md) and [lineup](LINEUP.md).
 
-- Jellyfin M3U/XMLTV feed with keyed access on a separate listener. Default
-  redirect transport remains the stable path to test.
-- Experimental FFmpeg HLS-to-MPEG-TS copy relay, not yet validated for all
-  Australian broadcaster audio renditions.
-- Experimental HDHomeRun discovery, which depends on a shared broadcast domain
-  and nonstandard tuner interoperability.
-- Teletext-inspired local information pages and TTI export; not an analogue
-  RF/PAL VBI transmitter.
-
-## Deferred until core bugs are addressed
-
-- Stable multi-user Docker TV and platform-native Linux/macOS tray integrations.
-- macOS packaging.
-- Dedicated Jellyfin plugin, DVR optimisation, stable remote hardware control.
-
-Keep authenticated feeds behind a private-network firewall. Do not turn the
-Windows desktop's loopback-only HTTP service into a public network server.
-Start with [Jellyfin setup](JELLYFIN.md) and [known issues](BETA-KNOWN-ISSUES.md).
-
-Experimental previews: [Linux](LINUX.md) and [Docker](DOCKER.md).
+Outstanding: remaining selected FAST sources (Samsung TV Plus/Plex),
+compatible motorsport streams, live EPG/artwork coverage, client playback,
+and security hardening. HDHomeRun discovery is experimental and off by
+default. Dedicated native apps and native desktop packaging are retired,
+not active roadmap targets. Keep Docker listeners private.

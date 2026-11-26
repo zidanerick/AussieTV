@@ -1,4 +1,4 @@
-# Multi-architecture experimental server. Both listeners require explicit configuration.
+# AussieTV Docker server for linux/amd64 and linux/arm64. Explicit authenticated listeners.
 FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.24 AS build
 ARG TARGETOS
 ARG TARGETARCH

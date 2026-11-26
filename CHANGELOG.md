@@ -1,5 +1,13 @@
 # Changelog
 
+## Docker-first development (unreleased)
+
+- Docker-only deployment and CI distribution; remove native release jobs.
+- Headless server requires explicit authentication; feed-only disables browser listener.
+- Rewrite active setup and integration documentation, add environment example.
+- Preserve existing beta tag aliases, ports, appdata and channel selection.
+- Prior Windows release notes below are historical, not active support promises.
+
 ## v0.1.0-beta.1, 18 November 2026
 
 First publicly labelled beta. This version **supersedes the development-only

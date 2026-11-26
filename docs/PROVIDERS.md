@@ -9,8 +9,7 @@ clients. No full FAST service is integrated or claimed working yet. Set AUSSIETV
 Under the existing appdata mapping, create providers/providers.json and copy
 the example in config/providers.example.json. Add local .m3u and optional
 XMLTV files beside the manifest. Set AUSSIETV_PROVIDERS_FILE to
-/data/providers/providers.json and restart. The same file can be used on
-Linux or Windows via an absolute path. Set enabled=true for approved sources.
+/data/providers/providers.json and restart. Use the container path, not the host path. Set enabled=true for approved sources.
 
 Example M3U (reserved placeholder domain, not a real stream):
 
@@ -39,7 +38,7 @@ are ignored until a safe import policy is implemented.
 Candidate sources to verify separately: 9Rush, C31 Melbourne, C44 Adelaide,
 NHK World-Japan, DW English, France 24, CNA, and authorised FAST sources.
 Official online playback is not permission for arbitrary third-party
-redistribution; no unverified streams are shipped. Check rights, HLS
+redistribution; unverified public broadcaster candidates are readiness-gated, not claimed playable. Check rights, HLS
 compatibility, audio, artwork and guide mapping before inclusion.
 
 ## Hardening completed in this stage

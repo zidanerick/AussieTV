@@ -1,75 +1,87 @@
 # AussieTV
 
-**Status: early public beta, `v0.1.0-beta.1` (Windows x64).** This is the **first beta**, not version 2.0. Previous `v1.*` and `v2.0.*` names were internal development milestones and prototypes, not production releases. See [Development history](docs/DEVELOPMENT-HISTORY.md).
+**Early public beta (`v0.1.0-beta.1`), Docker-only deployment.**
 
-AussieTV is a self-hosted desktop application for Australian live TV with an electronic programme guide, remote-control navigation, Teletext-style pages, and optional Jellyfin M3U/XMLTV feeds. It is not affiliated with broadcasters, TVmaze, Jellyfin, or the EPG provider.
+AussieTV is a self-hosted Australian live television server, browser TV guide
+and optional Jellyfin M3U/XMLTV source. One container includes the Go server,
+browser interface, FFmpeg, fonts and certificate bundle. No separate desktop
+app, native installer or host FFmpeg installation is required.
 
-## Windows downloads
+## Install
 
-The same beta version has **two different distribution files**, published as assets of a single GitHub prerelease:
+Supported images: Linux amd64 and arm64, including Unraid, Docker Engine,
+Docker Compose and Linux containers on Docker Desktop. Windows and macOS
+users access the same browser UI; native executables are no longer distributed.
 
-| Edition | File | What you get |
-| --- | --- | --- |
-| **Portable** | `AussieTV-Portable-v0.1.0-beta.1-win-x64.zip` | Extract and launch `AussieTV.exe`; includes FFmpeg and no installer |
-| **Windows Setup** | `AussieTV-Setup-v0.1.0-beta.1-win-x64.exe` | Standard setup wizard, install folder, Start Menu shortcuts, uninstaller, and optional verified FFmpeg download/update to a chosen folder |
+| Image | Purpose |
+| --- | --- |
+| `ghcr.io/zidanerick/aussietv:experimental-v0.1.0-beta.1` | Main branch beta (existing compatible tag) |
+| `ghcr.io/zidanerick/aussietv:docker-preview` | Development branch, published after tests |
+| `ghcr.io/zidanerick/aussietv:sha-<commit>` | Exact tested multi-architecture build |
 
-Find both on [GitHub Releases](https://github.com/zidanerick/AussieTV/releases). The setup EXE is currently **unsigned**, so Windows SmartScreen may request confirmation. Do not download builds from untrusted mirrors.
+A tag only receives the Docker-first changes when its branch passes CI and
+publishes. [Container registry](https://github.com/zidanerick/AussieTV/pkgs/container/aussietv)
+and [CI builds](https://github.com/zidanerick/AussieTV/actions/workflows/experimental-builds.yml).
 
-## Start and exit
-
-1. Install or extract the app and launch `AussieTV.exe`.
-2. The TV opens in your **Windows default browser** and AussieTV remains in the notification area by the clock.
-3. Closing the browser tab does **not** stop AussieTV. Right-click the tray icon to reopen the TV, open **Settings**, view logs or **Exit AussieTV**.
-4. If the window doesn't open, use `http://127.0.0.1:45781` or launch `AussieTV-Diagnostics.exe`. The local TV interface is bound to loopback only.
-
-The setup wizard defaults to a **per-user installation** (`%LOCALAPPDATA%\Programs\AussieTV`); no administrator permission is necessary until you explicitly enable LAN firewall rules from Settings. The installer offers an FFmpeg folder selection and download/update option. You can update FFmpeg again from the Start Menu via **Update FFmpeg**, without reinstalling AussieTV. Portable users can run `UPDATE-FFmpeg.cmd`.
-
-## What works and what remains experimental
-
-- Remote-friendly TV guide, regional channel lists, favourites, broadcaster logos, programme artwork and optional broadcaster-supplied captions.
-- Teletext-inspired web pages, TTI export and an optional video information channel. This **is not** a real analogue PAL/VBI Teletext transmitter.
-- Optional **Jellyfin M3U tuner** with XMLTV guide, programme artwork when accurately identified by TVmaze, and authenticated LAN feeds. Direct redirect is the **default** stream transport.
-- Experimental HDHomeRun autodiscovery and **FFmpeg MPEG-TS stream copy** are **not considered stable**. Playback may be slow or fail, and some SBS channels have had missing-audio reports. Leave the MPEG-TS mode disabled unless testing.
-- Real Windows tray, firewall elevation, remote-device input, multiple Jellyfin clients, and programme-artwork import have not passed comprehensive hardware tests. File issues with the beta version, channel name, player diagnostic summary and reproduction steps. **Never include feed API keys or signed HLS URLs in logs or screenshots.**
-
-### Jellyfin
-
-Enable the feed through the tray **Settings**. For Jellyfin on a different machine, enable LAN access and allow the narrowly scoped Windows Private firewall exception when requested. Use the URLs shown in Settings under Jellyfin Dashboard > Live TV > Add M3U Tuner and Add XMLTV. *Allow stream sharing* should remain enabled if disabling it causes playback errors. There is **no** need to forward router ports to the Internet. Refer to [Jellyfin setup and known limitations](docs/JELLYFIN.md).
-
-### FFmpeg and legal notices
-
-The portable package includes a separately licensed, checksum-verified FFmpeg binary from the distribution source linked by [FFmpeg.org](https://ffmpeg.org/download.html). The setup wizard downloads FFmpeg only when selected and verifies the provider-published SHA-256. Source/provenance and GPL notices accompany the download; FFmpeg is **not** an original AussieTV component. FFmpeg is only needed for experimental MPEG-TS or Teletext video output, not ordinary browser TV playback.
-
-## Build and test
-
-Go 1.22+ and Node 22+:
+For browser TV plus Jellyfin, clone this repository, copy `.env.example` to
+`.env`, restrict its permissions, and set separate random secrets (at least
+24 characters, e.g. generate twice using `openssl rand -hex 24`).
 
 ```sh
-go test ./... -count=1
-go test -race ./...
-go vet ./...
-node --test tests/remote_keys.test.cjs tests/settings_page.test.cjs
-go run ./tools/iconbuilder
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w -H=windowsgui' -o AussieTV.exe .
+cp .env.example .env
+chmod 600 .env
+# Edit .env before starting
+docker compose -f compose.web.yaml -f compose.jellyfin.yaml up -d --wait
 ```
 
-A GitHub Actions Windows release workflow additionally compiles a portable ZIP and a real Inno Setup installer, including an optional FFmpeg setup page. The supported release remains Windows-only. Separate experimental Linux and Docker builds are available as CI artifacts; macOS remains deferred.
+Open http://127.0.0.1:45781 on the Docker host using the configured username
+and password. Both published ports default to loopback. Set private network
+bindings and a reachable Jellyfin base URL as needed; use HTTPS for browser
+access beyond the host. For feed-only deployments use `docker compose up -d`;
+for web-only use `docker compose -f compose.web.yaml up -d`.
+[Full Docker and Unraid instructions](docs/DOCKER.md).
 
-## Experimental builds
+## Features and configuration
 
-- [Linux x64 and ARM64](docs/LINUX.md): portable archives and the local TV UI.
-- [Docker x64 and ARM64](docs/DOCKER.md): Jellyfin feed and optional authenticated browser TV; FFmpeg included.
+- Regional guide, favourites, remote-friendly browser controls, channel logos
+  and TVmaze programme artwork.
+- Authenticated Jellyfin feeds on 45782, with direct HLS redirect default
+  and optional guarded relay, experimental MPEG-TS and Fast Tune.
+- Selected expanded lineup (`AUSSIETV_EXTRA_AU_CHANNELS=1`), public
+  broadcaster manifest readiness checks and optional approved local M3U/XMLTV.
+- Teletext pages and optional in-vision channel 995; not an analogue encoder.
 
-Download tested archives from [GitHub Actions](https://github.com/zidanerick/AussieTV/actions/workflows/experimental-builds.yml). The container registry publishes tested main and development preview images after tests pass. These builds do not modify the existing Windows release.
+See [Jellyfin](docs/JELLYFIN.md), [lineup](docs/LINEUP.md),
+[providers](docs/PROVIDERS.md), [Teletext](docs/TELETEXT.md) and
+[remote controls](docs/REMOTE.md). Configuration is through container
+environment variables and files in the persistent /data volume.
+Closing the browser does not stop the service. Update by pulling and recreating
+the container, preserving /data and secrets.
 
-## Experimental provider manager
+## Development
 
-Optional administrator-configured M3U/XMLTV sources extend the existing regional lineup. See [provider setup](docs/PROVIDERS.md). Extra providers are disabled by default. Enable the [selected expanded lineup](docs/LINEUP.md) with AUSSIETV_EXTRA_AU_CHANNELS=1.
+```sh
+docker build -t aussietv:local .
+# Set AUSSIETV_IMAGE=aussietv:local in .env
+docker compose -f compose.web.yaml -f compose.jellyfin.yaml up -d --wait
+```
 
-## Data providers and privacy
+CI runs Go, browser and template tests, builds both image architectures,
+checks authenticated listener modes, Compose, FFmpeg and shutdown, and publishes
+the exact tested images. Source-level Go/Node tests remain available for
+developers; native packaging is retired. See [developer instructions](AGENTS.md).
 
-Channel/EPG index: [i.mjh.nz](https://i.mjh.nz/au/); series metadata/artwork: [TVmaze](https://www.tvmaze.com/api). Public broadcaster streams may change, require authentication or DRM, or be unavailable in some locations. AussieTV does not supply or bypass protected streams. Feed credentials are stored locally. Do not expose Jellyfin's feed service or experimental HDHomeRun endpoints to the public Internet.
+## Security and limitations
 
-Documentation: [release notes](RELEASE_NOTES.md), [Teletext](docs/TELETEXT.md), [remote controls](docs/REMOTE.md), [known issues](docs/BETA-KNOWN-ISSUES.md), [developer instructions](AGENTS.md).
+Keep both listeners private, use distinct feed and browser credentials, and
+use a trusted HTTPS reverse proxy for LAN browser access. Do not port-forward
+AussieTV. Never share signed upstream URLs or feed keys. Source availability,
+DRM, artwork coverage and live Jellyfin playback vary by provider. Docker
+health confirms listener availability, not successful television playback.
+See [known issues](docs/BETA-KNOWN-ISSUES.md).
 
-License: [MIT](LICENSE), excluding third-party content and FFmpeg, which carry their own terms.
+Channel index: [i.mjh.nz](https://i.mjh.nz/au/); artwork:
+[TVmaze](https://www.tvmaze.com/api). Unaffiliated with the services.
+AussieTV code is [MIT](LICENSE); third-party media and FFmpeg have their own
+terms. Existing Windows releases remain available as unsupported historical
+artifacts, not the current installation path. [Development history](docs/DEVELOPMENT-HISTORY.md).

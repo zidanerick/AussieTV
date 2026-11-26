@@ -1,42 +1,29 @@
-# AussieTV developer handoff
+# AussieTV developer instructions
 
-**Current branch:** `main` targets **`v0.1.0-beta.1`**, the first early
-Windows-only beta. Previous `v1.*`/`v2.0.*` strings were pre-beta build labels.
-Do not revive them as release versions. Keep code and documentation versioned
-from `RELEASE_VERSION` and the `main.go` constant until these can be unified.
+Current beta marker: v0.1.0-beta.1. Docker is the sole supported distribution
+and server runtime. Do not rename the version without updating RELEASE_VERSION
+and the Go constant. Do not publish standalone Windows/Linux releases.
 
-## Scope
-
-- Supported beta target: Windows 10/11 x64, portable and Inno Setup installer.
-- Normal TV binds localhost `127.0.0.1:45781` (or a free loopback port).
-- Optional Jellyfin authenticated feed is TCP 45782, LAN gated via Settings;
-  HDHomeRun discovery is optional and experimental (UDP 65001 / TCP 80).
-- Direct Jellyfin HLS redirect is the default. FFmpeg MPEG-TS, Teletext video,
-  and HDHomeRun auto-discovery are experimental and can fail on real sources.
-- macOS remains deferred. Linux and Docker are experimental CI targets.
-  Docker retains feed-only mode and offers an explicitly configured authenticated
-  browser UI without desktop management endpoints.
-
-## Build / packaging
-
-- `go test ./... -count=1 && go vet ./...`
-- `go test -race ./...`
-- `node --test tests/remote_keys.test.cjs tests/settings_page.test.cjs`
-- `go run ./tools/iconbuilder` then cross-compile Windows GUI and diagnostic.
-- `.github/workflows/beta-release.yml` builds two assets and only creates a
-  prerelease after all Windows tests, FFmpeg checksum validation, and Inno
-  Setup compilation succeed. Do not overwrite an existing beta tag.
-- `installer/AussieTV.iss` includes optional FFmpeg download with a user-
-  selected folder and Start Menu update action. Script:
-  `tools/ffmpeg/fetch-windows.ps1` validates the SHA-256 and executable.
-
-## Review policy
-
-Preserve Jellyfin feed authentication, SSRF/redirect rules, loopback host and
-origin checks, firewall Private-only rules, and FFmpeg cancellation. Never log
-signed broadcaster URLs or feed tokens. Keep new transport changes opt-in.
-
-Use `docs/BETA-KNOWN-ISSUES.md` for unresolved concerns, and
-`docs/DEVELOPMENT-HISTORY.md` for old snapshots. The README should describe
-only active beta functionality. **Do not delete historical branches or releases
-without an explicit retention decision.**
+- Preserve the Go server, embedded browser UI and authenticated web/feed
+  listeners (45781/45782). No desktop startup, settings, tray, firewall or
+  unauthenticated fallback listener. Feed-only mode has no web listener.
+- Linux amd64/arm64 container, UID/GID 10001, /data persistent, FFmpeg included.
+  Use bridge networking, dropped capabilities, read-only root and explicit
+  secrets. Existing feed URLs, channel IDs, volume and tag compatibility matter.
+- Keep redirect default; relay/MPEG-TS/Fast Tune remain opt-in. Preserve
+  cancellation, resource bounds, HLS key validation and public-IP SSRF rules.
+- No device/geographic restriction bypass. Do not log credentials or signed
+  media URLs. Do not manufacture missing EPG or artwork.
+- CI: .github/workflows/experimental-builds.yml (historical filename) runs
+  Go tests, focused race tests, go vet, Node tests, Unraid template contract,
+  both image builds, authenticated web/feed-only and combined Compose tests,
+  FFmpeg and SIGTERM smoke tests. Publish only exact tested images on trusted
+  pushes. The preview branch never changes the main beta tag.
+- Development: docker build -t aussietv:local .; see docs/DOCKER.md.
+  Source tests: go run ./tools/iconbuilder; go test ./... -count=1; go vet ./...;
+  node --test tests/*.test.cjs; python3 -m unittest discover -s tests -p 'test_unraid_template.py'.
+- Legacy native helper code/tests may remain for compatibility and gradual
+  cleanup; do not reactivate native packaging. Previous releases and Git
+  history are preserved. Do not delete historical release assets or tags.
+- Distinguish synthetic tests, image smoke checks and live client evidence.
+  Keep README, docs/DOCKER.md, docs/JELLYFIN.md and known issues accurate.

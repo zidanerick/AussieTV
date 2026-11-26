@@ -972,215 +972,79 @@ func initTeletext() error {
 }
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "--healthcheck" {
-		if err := serverHealthcheck(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+	if len(os.Args)==2 && os.Args[1]=="--healthcheck" {
+		if err:=serverHealthcheck();err!=nil {fmt.Fprintln(os.Stderr,err);os.Exit(1)}
 		return
 	}
-	if code, handled := maybeRunFirewallHelper(os.Args); handled {
-		os.Exit(code)
+	// Docker is the supported runtime. No desktop tray, browser launch,
+	// firewall helper, settings writer or unauthenticated fallback listener.
+	log.SetOutput(os.Stdout)
+	log.SetFlags(log.LstdFlags|log.Lshortfile)
+	if os.Getenv("AUSSIETV_MODE")!="server" {
+		log.Fatal("AussieTV requires the Docker server configuration; see docs/DOCKER.md")
 	}
-	prepareLogging()
+	webCfg,err:=dockerWebConfigFromEnv(true)
+	if err!=nil {log.Fatal(err)}
+	feedCfg,feedEnabled,err:=jellyfinConfigFromEnv()
+	if err!=nil {log.Fatal(err)}
+	if webCfg==nil && !feedEnabled {log.Fatal("Configure at least one authenticated listener")}
+	ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM)
+	defer stop()
+
 	initArtworkDiskCache()
 	extraAustralianEnabled=os.Getenv("AUSSIETV_EXTRA_AU_CHANNELS")=="1"
-	if providers,err:=loadProviderSet(os.Getenv("AUSSIETV_PROVIDERS_FILE"));err!=nil{
+	if providers,err:=loadProviderSet(os.Getenv("AUSSIETV_PROVIDERS_FILE"));err!=nil {
 		log.Printf("Additional providers disabled: %v",err)
-	}else{installedProviders=providers;if len(providers.Channels)>0{log.Printf("Loaded %d additional channels",len(providers.Channels))}}
-	if err := initTeletext(); err != nil {
-		log.Printf("Teletext unavailable: %v", err)
+	} else {
+		installedProviders=providers
+		if len(providers.Channels)>0 {log.Printf("Loaded %d additional channels",len(providers.Channels))}
 	}
-
-	serverMode := os.Getenv("AUSSIETV_MODE") == "server"
-	webCfg, err := dockerWebConfigFromEnv(serverMode)
-	if err != nil {
-		startupFailure(err)
-	}
-	feedCfg, envEnabled, feedErr := jellyfinConfigFromEnv()
-	if feedErr != nil {
-		startupFailure(feedErr)
-	}
-	if serverMode && !envEnabled && webCfg == nil {
-		startupFailure(errors.New("server mode requires configured Jellyfin feed credentials or authenticated web UI"))
-	}
-	supervisor := &feedSupervisor{}
+	if err:=initTeletext();err!=nil {log.Printf("Teletext unavailable: %v",err)}
+	supervisor:=&feedSupervisor{}
 	defer supervisor.Close()
-	var settings *settingsController
-	if !serverMode {
-		var err error
-		settings, err = newSettingsController(supervisor, envEnabled)
-		if err != nil {
-			// Never hide the entire TV app because an older/corrupted settings file
-			// cannot be loaded. Keep the original file for diagnostics.
-			log.Printf("Cannot load saved settings: %v", err)
-			settings, err = newDefaultSettingsController(supervisor, envEnabled)
-			if err != nil {
-				startupFailure(fmt.Errorf("create default settings: %w", err))
-			}
-		}
-	}
-	if envEnabled {
-		if settings != nil {
-			settings.config = desktopSettings{Enabled: true, LAN: strings.HasPrefix(feedCfg.Bind, "0.0.0.0:"), Discovery: feedCfg.Discovery, StreamMode: feedCfg.StreamMode, BaseURL: feedCfg.BaseURL, Region: feedCfg.Region, Key: feedCfg.Key}
-		}
-		if err := supervisor.Replace(feedCfg, true); err != nil {
-			if serverMode {
-				startupFailure(fmt.Errorf("Jellyfin feed listener: %w", err))
-			}
-			log.Printf("Jellyfin feed unavailable (TV interface still starts): %v", err)
-		}
-	} else if settings != nil {
-		cfg, enabled := desktopToJellyfin(settings.config)
-		if err := supervisor.Replace(cfg, enabled); err != nil {
-			// This is an optional network integration, never a fatal TV startup error.
-			log.Printf("Jellyfin feed unavailable (TV interface still starts): %v", err)
-		}
-	}
-	if serverMode && envEnabled {
-		warmCtx, stopWarm := context.WithCancel(context.Background())
-		defer stopWarm()
-		go warmProgrammeArtwork(warmCtx, feedCfg.Region)
-		if syncCfg, err := artworkSyncFromEnv(feedCfg); err != nil {
+	if feedEnabled {
+		if err:=supervisor.Replace(feedCfg,true);err!=nil {log.Fatalf("Jellyfin listener: %v",err)}
+		go warmProgrammeArtwork(ctx,feedCfg.Region)
+		if syncCfg,err:=artworkSyncFromEnv(feedCfg);err!=nil{
 			log.Printf("Jellyfin artwork sync disabled: %v",err)
 			artworkSyncStatus.Lock()
 			artworkSyncStatus.report.Status=err.Error()
 			artworkSyncStatus.Unlock()
-		} else if syncCfg != nil {
-			go syncCfg.run(warmCtx)
-		}
+		} else if syncCfg!=nil {go syncCfg.run(ctx)}
 	}
-	publicCtx, stopPublic := context.WithCancel(context.Background())
-	defer stopPublic()
-	go runPublicBroadcasterChecks(publicCtx)
-	log.Printf("AussieTV v%s starting on %s/%s", version, runtime.GOOS, runtime.GOARCH)
-	mux := http.NewServeMux()
-	if teletextService != nil {
-		mux.Handle("GET /teletext/", teletextService.Handler())
+	go runPublicBroadcasterChecks(ctx)
+	log.Printf("AussieTV v%s server starting on %s/%s",version,runtime.GOOS,runtime.GOARCH)
+
+	if webCfg==nil {
+		log.Print("Jellyfin-only mode; browser listener disabled")
+		<-ctx.Done()
+		log.Print("AussieTV stopped")
+		return
 	}
-	mux.HandleFunc("GET /", serveAppAsset)
-	mux.HandleFunc("GET /api/artwork", artworkHandler)
-	mux.HandleFunc("GET /api/logo", logoHandler)
-	mux.HandleFunc("GET /api/channels", func(w http.ResponseWriter, r *http.Request) {
-		markPing()
-		jsonResponse(w, loadChannels(r.URL.Query().Get("region")))
+	mux:=http.NewServeMux()
+	if teletextService!=nil {mux.Handle("GET /teletext/",teletextService.Handler())}
+	mux.HandleFunc("GET /",serveAppAsset)
+	mux.HandleFunc("GET /api/artwork",artworkHandler)
+	mux.HandleFunc("GET /api/logo",logoHandler)
+	mux.HandleFunc("GET /api/channels",func(w http.ResponseWriter,r *http.Request){
+		jsonResponse(w,loadChannels(r.URL.Query().Get("region")))
 	})
-	mux.HandleFunc("POST /api/heartbeat", func(w http.ResponseWriter, r *http.Request) { markPing(); w.WriteHeader(204) })
-	mux.HandleFunc("GET /hls", hlsHandler)
-	if settings != nil {
-		mux.HandleFunc("GET /api/settings", settings.handler)
-		mux.HandleFunc("POST /api/settings", settings.handler)
-	}
-	mux.HandleFunc("GET /channel.m3u", func(w http.ResponseWriter, r *http.Request) {
-		id := r.URL.Query().Get("ch")
-		d := loadChannels(r.URL.Query().Get("region"))
-		for _, ch := range d.Channels {
-			if ch.ID == id && ch.Stream != "" {
-				w.Header().Set("Content-Type", "application/x-mpegurl")
-				w.Header().Set("Content-Disposition", "attachment; filename=\"AussieTV-"+strings.ReplaceAll(ch.Name, " ", "-")+".m3u\"")
-				fmt.Fprintf(w, "#EXTM3U\n#EXTINF:-1,%s\n%s\n", ch.Name, ch.Stream)
-				return
-			}
-		}
-		http.NotFound(w, r)
-	})
-	mux.HandleFunc("POST /api/quit", func(w http.ResponseWriter, r *http.Request) {
-		// Browser windows never own the lifetime of a tray application.
-		if serverMode || trayReady.Load() {
-			http.Error(w, "Use the tray menu to exit", http.StatusForbidden)
-			return
-		}
-		w.WriteHeader(204)
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			defer cancel()
-			_ = server.Shutdown(ctx)
-		}()
-	})
-	bind := "127.0.0.1:45781"
-	if webCfg != nil {
-		bind = webCfg.bind
-	}
-	listener, err := net.Listen("tcp", bind)
-	if err != nil && webCfg == nil {
-		log.Printf("Port 45781 unavailable (%v); trying a free port", err)
-		listener, err = net.Listen("tcp", "127.0.0.1:0")
-	}
-	if err != nil {
-		startupFailure(err)
-	}
-	server = &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		host := r.Host
-		if h, _, err := net.SplitHostPort(host); err == nil {
-			host = h
-		}
-		if host != "127.0.0.1" && host != "localhost" {
-			http.Error(w, "Invalid local host", 403)
-			return
-		}
-		if origin := r.Header.Get("Origin"); origin != "" {
-			u, err := url.Parse(origin)
-			if err != nil || u.Host != r.Host || u.Scheme != "http" {
-				http.Error(w, "Invalid origin", 403)
-				return
-			}
-		}
-		mux.ServeHTTP(w, r)
-	}), ReadHeaderTimeout: 10 * time.Second}
-	if webCfg != nil {
-		server.Handler = webCfg.handler(mux)
-		server.IdleTimeout = 60 * time.Second
-		server.MaxHeaderBytes = 1 << 16
-	}
-	addr := "http://" + listener.Addr().String()
-	log.Printf("AussieTV listening at %s", addr)
-	if !serverMode {
-		if runtime.GOOS == "windows" && os.Getenv("AUSSIETV_NO_TRAY") != "1" {
-			logFile := filepath.Join(os.Getenv("LOCALAPPDATA"), "AussieTV", "startup.log")
-			stop := func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				defer cancel()
-				_ = server.Shutdown(ctx)
-			}
-			if err := startTray(addr, addr+"/settings", logFile, stop); err != nil {
-				log.Printf("Tray registration failed; continuing in browser mode: %v", err)
-				go heartbeatWatch()
-			} else {
-				trayReady.Store(true)
-			}
-		} else {
-			go heartbeatWatch()
-		}
-		go func() {
-			time.Sleep(200 * time.Millisecond)
-			if err := openBrowser(addr); err != nil {
-				log.Printf("Could not open browser: %v", err)
-			}
-		}()
-	}
-	var shutdownDone chan struct{}
-	var signalCtx context.Context
-	if serverMode {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer stop()
-		signalCtx = ctx
-		shutdownDone = make(chan struct{})
-		go func() {
-			defer close(shutdownDone)
-			<-ctx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := server.Shutdown(shutdownCtx); err != nil {
-				_ = server.Close()
-			}
-		}()
-	}
-	err = server.Serve(listener)
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		startupFailure(fmt.Errorf("server stopped: %w", err))
-	}
-	if signalCtx != nil && signalCtx.Err() != nil {
-		<-shutdownDone
-	}
-	log.Println("AussieTV stopped")
+	mux.HandleFunc("GET /hls",hlsHandler)
+	listener,err:=net.Listen("tcp",webCfg.bind)
+	if err!=nil {log.Fatalf("Browser listener: %v",err)}
+	server=&http.Server{Handler:webCfg.handler(mux),ReadHeaderTimeout:10*time.Second,IdleTimeout:60*time.Second,MaxHeaderBytes:1<<16}
+	log.Printf("AussieTV browser listening at %s",listener.Addr())
+	done:=make(chan struct{})
+	go func(){
+		defer close(done)
+		<-ctx.Done()
+		shutdownCtx,cancel:=context.WithTimeout(context.Background(),5*time.Second)
+		defer cancel()
+		if err:=server.Shutdown(shutdownCtx);err!=nil {_=server.Close()}
+	}()
+	err=server.Serve(listener)
+	if err!=nil && !errors.Is(err,http.ErrServerClosed){log.Printf("Browser server failed: %v",err);stop();<-done;os.Exit(1)}
+	stop()
+	<-done
+	log.Print("AussieTV stopped")
 }

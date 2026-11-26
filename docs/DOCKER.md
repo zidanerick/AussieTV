@@ -1,117 +1,120 @@
-# Docker experimental build
+# Docker and Unraid installation
 
-The Windows beta release remains unchanged. Docker supports Linux amd64 and
-arm64. FFmpeg, CA certificates and fonts are included. The process runs as
-UID/GID 10001; use a named volume for /data or set bind-mount ownership
-accordingly. No privileged mode or host networking is required.
+Docker is the supported deployment for AussieTV. Linux amd64/arm64 images
+include FFmpeg, fonts and certificates. Use Docker Engine with Compose v2,
+Unraid or Docker Desktop in Linux-container mode. The container runs as
+UID/GID 10001. No privileged mode, host networking or host FFmpeg is required.
 
-After the experimental workflow passes on main, it publishes the tested images (not a rebuild) as
-`ghcr.io/zidanerick/aussietv:experimental-v0.1.0-beta.1` and a commit SHA tag.
-The repository owner may need to make the GHCR package public. The trusted Docker development branch also publishes a separate `docker-preview` tag after tests pass; it never changes the main beta tag. All builds provide architecture-specific docker save archives. Extract the
-Actions artifact ZIP, verify SHA256SUMS, then `docker load -i <archive.tar.gz>`;
-the local loaded tag is `aussietv:ci`.
+## Image selection
 
-## Browser TV (opt-in)
+- Main beta: `ghcr.io/zidanerick/aussietv:experimental-v0.1.0-beta.1`
+  (historical tag retained for upgrades).
+- Development: `ghcr.io/zidanerick/aussietv:docker-preview`.
+- Pin an exact tested revision: `ghcr.io/zidanerick/aussietv:sha-<commit>`.
 
-    export AUSSIETV_WEB_PASSWORD="$(openssl rand -hex 24)"
-    docker compose -f compose.web.yaml up -d
+CI publishes only after tests pass. A successful branch push is not proof
+that its image has been published. Use [Actions](https://github.com/zidanerick/AussieTV/actions)
+and [GHCR](https://github.com/zidanerick/AussieTV/pkgs/container/aussietv).
+If GHCR requires authentication, use an authorised package read token or
+load the tested architecture artifact with `docker load -i archive.tar.gz`
+after verifying SHA256SUMS. The loaded tag is aussietv:ci.
 
-Open http://127.0.0.1:45781 and log in as viewer using the generated password.
-Store the password in a private .env file for persistent deployments. For
-local testing of the loaded CI image, set AUSSIETV_IMAGE=aussietv:ci.
-Alternatively build locally with `docker build -t aussietv:local .` and
-set AUSSIETV_IMAGE=aussietv:local.
+## Docker Compose
 
-Unraid: use the same image, bridge networking, /data mapped to an appdata
-directory owned by 10001, and container TCP 45781. Set AUSSIETV_MODE=server,
-AUSSIETV_WEB_BIND=0.0.0.0:45781, AUSSIETV_WEB_USER, a random password of at
-least 24 characters in AUSSIETV_WEB_PASSWORD, AUSSIETV_WEB_ORIGIN to the
-exact browser origin (e.g. https://tv.example.test), and set
-AUSSIETV_JELLYFIN_BIND to an empty string unless configuring the feed.
+Copy .env.example to .env, chmod 600 and edit it. Generate two distinct
+random secrets with openssl rand -hex 24. Empty secrets fail validation.
 
-HTTP Basic authentication is not encryption. Use an HTTPS reverse proxy
-with a trusted certificate for LAN access, preserving Host and using the
-exact HTTPS origin. Bind the published port to loopback when using a local
-proxy; never expose the service directly to the Internet. If you explicitly
-publish on a LAN address, restrict direct access to trusted clients/proxy
-with a firewall. No multi-user account management or browser settings/quit
-endpoints are exposed. Real playback, subtitles and remote input still
-require testing. This is not a stable multi-user server.
-
-## Unraid deployment
-
-A manual Unraid v2 template is provided at [unraid/AussieTV.xml](../unraid/AussieTV.xml). It is not submitted to Community Applications and has not been imported on a real Unraid host yet. It requires an explicit HTTPS browser origin and a unique password; Jellyfin is opt-in. For the preview registry image, replace the template Repository field with `ghcr.io/zidanerick/aussietv:docker-preview` after a successful publish. The template deliberately leaves WebUI blank; set the correct HTTPS URL in Advanced View. Before starting, create and permission the appdata directory as below. Review the published port and restrict access to the HTTPS proxy.
-
-
-Use Add Container in the Docker tab (Advanced View if necessary). For the
-current CI artifact, load the amd64 image first and set Repository to
-`aussietv:ci`; once GHCR is published use the registry image instead.
-
-| Field | Value |
+| Mode | Command |
 | --- | --- |
-| Name | AussieTV |
-| Repository | ghcr.io/zidanerick/aussietv:experimental-v0.1.0-beta.1 |
-| Network type | Bridge |
-| Privileged | Off |
-| WebUI | Exact configured origin |
-| Container path | /data |
-| Host path | /mnt/user/appdata/aussietv |
-| Web port (optional) | 45781/TCP |
-| Jellyfin port (optional) | 45782/TCP |
+| Browser and Jellyfin | `docker compose -f compose.web.yaml -f compose.jellyfin.yaml up -d --wait` |
+| Jellyfin only | `docker compose up -d --wait` |
+| Browser only | `docker compose -f compose.web.yaml up -d --wait` |
 
-Before mounting the directory, run on the Unraid host:
+The three files are intentionally retained for existing installations.
+Use the same file arguments for pull, up, logs and down. A single container
+serves both listeners in combined mode; do not start the modes as separate
+instances on conflicting ports. Browser UI defaults to http://127.0.0.1:45781
+on the host. Both published ports default to host loopback. If Jellyfin is on
+another host, set AUSSIETV_FEED_HOST_BIND to a reachable private host IP
+and AUSSIETV_JELLYFIN_BASE_URL to its reachable address (not Jellyfin's own
+web UI). For browser LAN viewing use an HTTPS reverse proxy with a trusted
+certificate, preserve Host, set AUSSIETV_WEB_ORIGIN to the exact browser
+origin, and restrict direct access to the backend.
+
+## Unraid
+
+The [manual template](../unraid/AussieTV.xml) is not listed in Community
+Applications. In Docker > Add Container, use the fields below or import
+the template using your usual Unraid template workflow.
+
+| Setting | Value |
+| --- | --- |
+| Repository | Main beta tag above, or docker-preview for development |
+| Network | Bridge |
+| Privileged | No |
+| Appdata | /mnt/user/appdata/aussietv mapped to /data |
+| Browser port | 45781/TCP (if enabled) |
+| Jellyfin feed port | 45782/TCP (if enabled) |
+| Extra parameters | --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m |
+
+For a **new** appdata directory only:
 `mkdir -p /mnt/user/appdata/aussietv && chown 10001:10001 /mnt/user/appdata/aussietv && chmod 700 /mnt/user/appdata/aussietv`.
-This changes ownership only of the named new appdata directory. Do not apply
-it recursively to all appdata. Use a trusted HTTPS reverse proxy for browser
-TV and match its origin exactly. Keep Jellyfin's port on a private network.
+Do not recursively change unrelated appdata ownership. Existing working
+mounts need no change. Set WebUI to the configured browser origin in Advanced
+View. The template leaves it blank for safety. Do not expose these ports to
+the Internet. A manual template has static CI tests but no automated Unraid GUI test.
 
-| Environment variable | Value / purpose |
+## Environment reference
+
+| Variable | Purpose / example |
 | --- | --- |
-| AUSSIETV_MODE | server |
-| AUSSIETV_WEB_BIND | 0.0.0.0:45781, or empty to disable |
-| AUSSIETV_WEB_ORIGIN | exact browser origin, e.g. https://tv.example.test |
-| AUSSIETV_WEB_USER | viewer or chosen username |
-| AUSSIETV_WEB_PASSWORD | random secret, at least 24 characters |
-| AUSSIETV_JELLYFIN_BIND | 0.0.0.0:45782, or explicitly empty to disable |
-| AUSSIETV_JELLYFIN_BASE_URL | http://YOUR_UNRAID_IP:45782 (if feed enabled) |
-| AUSSIETV_JELLYFIN_KEY | random secret, at least 24 characters |
-| AUSSIETV_JELLYFIN_REGION | Melbourne (or another supported region) |
-| AUSSIETV_JELLYFIN_STREAM_MODE | redirect (recommended); fast-tune experimental |
+| AUSSIETV_MODE | server (image default; required) |
+| AUSSIETV_WEB_BIND | 0.0.0.0:45781 or empty to disable |
+| AUSSIETV_WEB_ORIGIN | Exact http(s) origin, no trailing slash |
+| AUSSIETV_WEB_USER | viewer or chosen user |
+| AUSSIETV_WEB_PASSWORD | Unique secret, minimum 24 characters |
+| AUSSIETV_JELLYFIN_BIND | 0.0.0.0:45782 or empty to disable |
+| AUSSIETV_JELLYFIN_BASE_URL | Reachable AussieTV URL, e.g. http://192.168.1.10:45782 |
+| AUSSIETV_JELLYFIN_KEY | Separate secret, minimum 24 characters |
+| AUSSIETV_JELLYFIN_REGION | Melbourne or supported region |
+| AUSSIETV_JELLYFIN_STREAM_MODE | redirect (default), relay, mpegts, fast-tune |
+| AUSSIETV_EXTRA_AU_CHANNELS | 1 for selected expansion, otherwise 0 |
+| AUSSIETV_PROVIDERS_FILE | Optional /data/providers/providers.json |
+| AUSSIETV_TELETEXT_CONFIG | Optional /data/teletext.json; embedded default otherwise |
+| AUSSIETV_TELETEXT_VIDEO | 1 for channel 995, otherwise 0 |
+| AUSSIETV_JELLYFIN_ARTWORK_SYNC | 1 for opt-in direct artwork repair |
+| AUSSIETV_JELLYFIN_SERVER_URL | Jellyfin server URL for artwork repair |
+| AUSSIETV_JELLYFIN_API_KEY | Dedicated Jellyfin administrator API key (not feed key) |
 
-Run `openssl rand -hex 24` twice for separate secrets. Set extra parameters
-`--read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m`
-if using an Unraid configuration without equivalent controls. Do not use
-host networking or privileged mode for ordinary TV/Jellyfin.
+Compose-only variables: AUSSIETV_IMAGE, AUSSIETV_HOST_BIND,
+AUSSIETV_FEED_HOST_BIND. Environment values are deployment configuration;
+the browser UI has no admin settings or quit endpoint. At least one
+authenticated listener is required. Feed-only does not start a web listener.
+Browser Basic authentication and feed query keys are not encryption.
+Protect .env, backups, Docker access and reverse proxy logs.
 
-## Combined browser TV and Jellyfin (Compose)
+## Updates and rollback
 
-Set the web password and Jellyfin key/base URL in a private .env file, then:
+Use Unraid Check for Updates / Update, or the same Compose file arguments
+used to start the service with pull then up -d --wait. Preserve /data,
+environment variables, existing feed URLs and keys. Back up appdata
+and private deployment configuration before updates. Do not use down -v
+unless deliberately deleting the named volume. Roll back by pinning the
+previous tested SHA image and recreating the container.
 
-    docker compose -f compose.web.yaml -f compose.jellyfin.yaml up -d --wait
+Inspect docker ps, docker logs AussieTV or docker compose logs. Health checks
+test authenticated listeners locally, not external stream availability.
+Use /jellyfin/diagnostics?key=YOUR_KEY for redacted playback status (never
+share the URL/key). A browser tab closing does not stop the container.
+SIGTERM triggers shutdown. Docker restarts use restart: unless-stopped.
 
-Both listeners are enabled independently. Both published ports default to
-host loopback; set AUSSIETV_FEED_HOST_BIND to the private address reachable
-by Jellyfin if it runs on another host. For remote web viewing set up HTTPS
-as described above. Do not publish Jellyfin or browser TV to the Internet.
+## Local development
 
-## Health and maintenance
+```sh
+docker build -t aussietv:local .
+# Set AUSSIETV_IMAGE=aussietv:local in .env
+docker compose -f compose.web.yaml -f compose.jellyfin.yaml up -d --wait
+```
 
-Docker health checks confirm every enabled listener responds with valid
-credentials; they intentionally do not contact broadcasters. Inspect with
-`docker ps` and `docker logs AussieTV` (or `docker compose logs`).
-Server mode logs to stdout; Compose rotates logs. Closing a browser does
-not stop the server. SIGTERM initiates a bounded shutdown.
-
-## Jellyfin-only (original mode)
-
-Use compose.yaml with the required BASE_URL and KEY variables (the file now pulls the image instead of implicitly rebuilding). Both listeners now require explicit bind settings, so raw docker run users must set AUSSIETV_JELLYFIN_BIND=0.0.0.0:45782 when enabling the feed. Compose already sets it. The published feed port defaults to host loopback; set AUSSIETV_FEED_HOST_BIND to a private address reachable by Jellyfin when needed.
-
-    export AUSSIETV_JELLYFIN_BASE_URL=http://YOUR_SERVER_IP:45782
-    export AUSSIETV_JELLYFIN_KEY="$(openssl rand -hex 24)"
-    docker compose up -d
-
-Use the existing authenticated M3U/XMLTV endpoints and keep TCP 45782
-private. See [Jellyfin](JELLYFIN.md). The web UI remains loopback-only
-inside the container unless explicitly enabled. For combined deployment,
-publish 45782 separately and configure the Jellyfin environment alongside
-the web environment. HDHomeRun discovery is not enabled by default.
+No native binary package is produced. Source-level tests remain available
+to contributors; [developer instructions](../AGENTS.md).
