@@ -40,6 +40,7 @@ var syncIDPattern = regexp.MustCompile(`(?i)^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f
 type syncReport struct {
 	At string `json:"at,omitempty"`
 	Status string `json:"status"`
+	LastError string `json:"lastError,omitempty"`
 	Matched int `json:"matched"`
 	Existing int `json:"existing"`
 	Uploaded int `json:"uploaded"`
@@ -251,9 +252,9 @@ func (c *artworkSyncConfig) runOnce(ctx context.Context,data []Channel,now time.
 		uploaded,verified,err:=c.repair(ctx,id,art)
 		if uploaded {report.Uploaded++}
 		if verified {report.Verified++}
-		if err!=nil {report.Failed++} else if !uploaded {report.Existing++}
+		if err!=nil {report.Failed++;report.LastError=err.Error()} else if !uploaded {report.Existing++}
 	}
-	if report.Failed>0 {report.Status="some images failed; see server logs or check Jellyfin access"}
+	if report.Failed>0 {report.Status="some images failed; see lastError"}
 	return report
 }
 
