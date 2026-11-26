@@ -61,7 +61,7 @@ func artworkSyncFromEnv(feed jellyfinConfig) (*artworkSyncConfig,error) {
 	if os.Getenv("AUSSIETV_JELLYFIN_ARTWORK_SYNC")!="1" {return nil,nil}
 	base:=strings.TrimRight(strings.TrimSpace(os.Getenv("AUSSIETV_JELLYFIN_SERVER_URL")),"/")
 	u,err:=url.Parse(base)
-	if err!=nil || u.Hostname()=="" || (u.Scheme!="http" && u.Scheme!="https") || u.User!=nil || u.RawQuery!="" || u.ForceQuery || u.Fragment!="" || u.Opaque!="" {
+	if err!=nil || u==nil || u.Hostname()=="" || (u.Scheme!="http" && u.Scheme!="https") || u.User!=nil || u.RawQuery!="" || u.ForceQuery || u.Fragment!="" || u.Opaque!="" {
 		return nil,errors.New("artwork sync requires a valid Jellyfin server URL")
 	}
 	token:=strings.TrimSpace(os.Getenv("AUSSIETV_JELLYFIN_API_KEY"))
@@ -151,7 +151,7 @@ func (c *artworkSyncConfig) channels(ctx context.Context,data []Channel)(map[str
 	}
 	out:=map[string]Channel{}
 	for _,ch:=range list.Items {
-		if ch.Type!="TvChannel" && ch.Type!="LiveTvChannel" {continue}
+		if ch.Type!="TvChannel" && ch.Type!="LiveTvChannel" && ch.Type!="Channel" {continue}
 		if !syncIDPattern.MatchString(ch.ID) {continue}
 		number:=ch.Number;if number=="" {number=ch.ChannelNumber}
 		if number=="" {continue}
