@@ -11,6 +11,7 @@ services:
     ports:
       - "${AUSSIETV_FEED_HOST_BIND:-127.0.0.1}:45782:45782"
     environment:
+      AUSSIETV_PROVIDERS_FILE: ${AUSSIETV_PROVIDERS_FILE:-}
       AUSSIETV_MODE: server
       AUSSIETV_JELLYFIN_BIND: 0.0.0.0:45782
       AUSSIETV_JELLYFIN_BASE_URL: ${AUSSIETV_JELLYFIN_BASE_URL:?Provide your server LAN base URL in .env}

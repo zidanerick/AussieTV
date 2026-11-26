@@ -258,6 +258,13 @@ func relayPlaylistOrSegment(w http.ResponseWriter, r *http.Request, cfg jellyfin
 		recordTune(ch.ID, mode, 200, time.Since(started), upstream)
 		return
 	}
+	// Do not expose active upstream content as same-origin documents.
+	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
+	if strings.Contains(mime,"text/html") || strings.Contains(mime,"javascript") || strings.Contains(mime,"svg") || strings.Contains(mime,"application/xhtml") {
+		http.Error(w,"Unsupported media content",415)
+		recordTune(ch.ID,mode,415,time.Since(started),upstream)
+		return
+	}
 	for _, header := range []string{"Content-Type", "Content-Range", "Accept-Ranges", "Content-Length"} {
 		if value := response.Header.Get(header); value != "" {
 			w.Header().Set(header, value)
@@ -303,6 +310,7 @@ func relayDiagnostics(w http.ResponseWriter, _ *http.Request, cfg jellyfinConfig
 		"programmeArtworkCached":      posters,
 		"programmeArtworkMisses":      misses,
 		"programmeArtworkPending":     pending,
+		"additionalProviderChannels": len(installedProviders.Channels),
 		"jellyfinArtworkSync": getArtworkSyncReport(),
 		"events":                      tuneEvents(),
 		"relayManifestRequests":       relayManifestRequests.Load(),

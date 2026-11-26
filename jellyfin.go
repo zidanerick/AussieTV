@@ -269,7 +269,7 @@ func newJellyfinHandlerWithPool(cfg jellyfinConfig, load func(string) ChannelDat
 					serveJellyfinMPEGTS(w, r, cfg, ch)
 					return
 				}
-				if effectiveStreamMode(cfg.StreamMode) == "relay" {
+				if effectiveStreamMode(cfg.StreamMode) == "relay" || installedProviders.IDs[ch.ID] {
 					relayPlaylistOrSegment(w, r, cfg, ch, ch.Stream)
 					return
 				}
@@ -308,7 +308,7 @@ func newJellyfinHandlerWithPool(cfg jellyfinConfig, load func(string) ChannelDat
 	})
 	mediaHandler := func(w http.ResponseWriter, r *http.Request) {
 		id, err := base64.RawURLEncoding.DecodeString(r.PathValue("id"))
-		if err != nil || len(id) == 0 || len(id) > 512 || (effectiveStreamMode(cfg.StreamMode) != "relay" && !usesMPEGTS(cfg.StreamMode)) {
+		if err != nil || len(id) == 0 || len(id) > 512 || (effectiveStreamMode(cfg.StreamMode) != "relay" && !usesMPEGTS(cfg.StreamMode) && !installedProviders.IDs[string(id)]) {
 			http.NotFound(w, r)
 			return
 		}

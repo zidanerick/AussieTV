@@ -60,7 +60,11 @@ A GitHub Actions Windows release workflow additionally compiles a portable ZIP a
 - [Linux x64 and ARM64](docs/LINUX.md): portable archives and the local TV UI.
 - [Docker x64 and ARM64](docs/DOCKER.md): Jellyfin feed and optional authenticated browser TV; FFmpeg included.
 
-Download tested archives from [GitHub Actions](https://github.com/zidanerick/AussieTV/actions/workflows/experimental-builds.yml). The container registry publish job runs on main only after tests pass. These builds do not modify the existing Windows release.
+Download tested archives from [GitHub Actions](https://github.com/zidanerick/AussieTV/actions/workflows/experimental-builds.yml). The container registry publishes tested main and development preview images after tests pass. These builds do not modify the existing Windows release.
+
+## Experimental provider manager
+
+Optional administrator-configured M3U/XMLTV sources extend the existing regional lineup. See [provider setup](docs/PROVIDERS.md). Extra providers are disabled by default.
 
 ## Data providers and privacy
 

@@ -115,7 +115,7 @@ func safeDial(ctx context.Context, network, address string) (net.Conn, error) {
 	var dialer net.Dialer
 	for _, target := range ips {
 		ip := target.IP
-		if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+		if !publicMediaIP(ip) {
 			continue
 		}
 		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
@@ -421,6 +421,9 @@ func safeRegion(v string) string {
 	return "Melbourne"
 }
 func loadChannels(region string) ChannelData {
+	return appendProviderChannels(loadAustralianChannels(region))
+}
+func loadAustralianChannels(region string) ChannelData {
 	region = safeRegion(region)
 	cacheMu.Lock()
 	old, ok := cache[region]
@@ -609,14 +612,14 @@ func playlistURL(chID, remote string) string {
 }
 func validateRemote(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil {
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil || u.Opaque != "" || u.Fragment != "" || (u.Port() != "" && u.Port() != "80" && u.Port() != "443") {
 		return nil, errors.New("invalid stream address")
 	}
 	h := strings.ToLower(u.Hostname())
-	if h == "localhost" || strings.HasSuffix(h, ".localhost") || strings.HasSuffix(h, ".local") {
+	if localMediaHost(h) {
 		return nil, errors.New("blocked local address")
 	}
-	if ip := net.ParseIP(h); ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() || ip.IsMulticast()) {
+	if ip := net.ParseIP(h); ip != nil && !publicMediaIP(ip) {
 		return nil, errors.New("blocked private address")
 	}
 	return u, nil
@@ -645,6 +648,9 @@ func hlsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cacheMu.Unlock()
+	if found == nil {
+		if ch,ok:=externalProviderChannel(id);ok{found=&ch}
+	}
 	if found == nil {
 		http.Error(w, "Refresh channel listings and try again", 404)
 		return
@@ -905,6 +911,9 @@ func main() {
 	}
 	prepareLogging()
 	initArtworkDiskCache()
+	if providers,err:=loadProviderSet(os.Getenv("AUSSIETV_PROVIDERS_FILE"));err!=nil{
+		log.Printf("Additional providers disabled: %v",err)
+	}else{installedProviders=providers;if len(providers.Channels)>0{log.Printf("Loaded %d additional channels",len(providers.Channels))}}
 	if err := initTeletext(); err != nil {
 		log.Printf("Teletext unavailable: %v", err)
 	}

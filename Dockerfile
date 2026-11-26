@@ -1,5 +1,5 @@
 # Multi-architecture experimental server. Both listeners require explicit configuration.
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.24 AS build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
@@ -7,7 +7,7 @@ COPY . .
 RUN go run ./tools/iconbuilder && \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w" -o /out/aussietv .
 
-FROM alpine:3.21
+FROM alpine:3.24.4
 RUN apk add --no-cache ca-certificates ffmpeg font-dejavu && \
     addgroup -S -g 10001 aussietv && \
     adduser -S -D -u 10001 -G aussietv aussietv && \
