@@ -101,12 +101,12 @@ jobs:
             sleep 1
           done
           grep -qx ok /tmp/feed-health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:45782/jellyfin/health)" = 401
           docker exec tv-web /usr/local/bin/aussietv --healthcheck
           docker exec tv-feed /usr/local/bin/aussietv --healthcheck
           docker stop -t 15 tv-web tv-feed
           test "$(docker inspect -f '{{.State.ExitCode}}' tv-web)" = 0
           test "$(docker inspect -f '{{.State.ExitCode}}' tv-feed)" = 0
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:45782/jellyfin/health)" = 401
       - name: Test combined Compose deployment
         shell: bash
         env:

@@ -1059,10 +1059,15 @@ func main() {
 			}
 		}()
 	}
+	var shutdownDone chan struct{}
+	var signalCtx context.Context
 	if serverMode {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
+		signalCtx = ctx
+		shutdownDone = make(chan struct{})
 		go func() {
+			defer close(shutdownDone)
 			<-ctx.Done()
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -1074,6 +1079,9 @@ func main() {
 	err = server.Serve(listener)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		startupFailure(fmt.Errorf("server stopped: %w", err))
+	}
+	if signalCtx != nil && signalCtx.Err() != nil {
+		<-shutdownDone
 	}
 	log.Println("AussieTV stopped")
 }
