@@ -37,7 +37,9 @@ func pacedArtworkRequest(req *http.Request) (*http.Response,error) {
 }
 
 func lookupArtworkBackdrop(showID int) string {
-	req,err:=http.NewRequest("GET",fmt.Sprintf("https://api.tvmaze.com/shows/%d/images",showID),nil)
+	ctx,cancel:=context.WithTimeout(context.Background(),3*time.Second)
+	defer cancel()
+	req,err:=http.NewRequestWithContext(ctx,"GET",fmt.Sprintf("https://api.tvmaze.com/shows/%d/images",showID),nil)
 	if err!=nil {return ""}
 	req.Header.Set("User-Agent","AussieTV/0.1.0-beta.1 (TVmaze artwork attribution)")
 	resp,err:=pacedArtworkRequest(req)
