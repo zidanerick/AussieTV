@@ -1050,6 +1050,9 @@ func main() {
 			go syncCfg.run(warmCtx)
 		}
 	}
+	publicCtx, stopPublic := context.WithCancel(context.Background())
+	defer stopPublic()
+	go runPublicBroadcasterChecks(publicCtx)
 	log.Printf("AussieTV v%s starting on %s/%s", version, runtime.GOOS, runtime.GOARCH)
 	mux := http.NewServeMux()
 	if teletextService != nil {

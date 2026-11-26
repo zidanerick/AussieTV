@@ -59,5 +59,6 @@ func channelGroup(ch Channel) string {
 // Expanded streams are always inspected through the guarded relay rather
 // than redirecting Jellyfin directly to a provider. No change to Fast Tune.
 func requiresGuardedRelay(ch Channel) bool {
-	return installedProviders.IDs[ch.ID] || (extraAustralianEnabled && expandedCategory(ch)!="")
+	_,public:=publicBroadcasterChannel(ch.ID)
+	return public || installedProviders.IDs[ch.ID] || (extraAustralianEnabled && expandedCategory(ch)!="")
 }

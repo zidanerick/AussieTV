@@ -172,6 +172,7 @@ func loadProviderSet(path string)(providerSet,error){
 	seen:=map[string]bool{}
 	numbers:=map[string]bool{}
 	for _,spec:=range activeCurated(){numbers[spec.number]=true}
+	if extraAustralianEnabled {for _,ch:=range publicBroadcasterCandidates {numbers[ch.Number]=true}}
 	for _,s:=range manifest.Providers{
 		if !s.Enabled{continue}
 		if !providerID.MatchString(s.ID)||seen[s.ID]||!providerText(s.Name,64)||s.Name=="All"||s.Name=="Favourites"||s.NumberStart<1000||s.NumberStart>9899{return providerSet{},errors.New("invalid provider ID, name or numbering")}
@@ -196,14 +197,17 @@ func loadProviderSet(path string)(providerSet,error){
 }
 
 func appendProviderChannels(data ChannelData)ChannelData{
-	if len(installedProviders.Channels)==0{return data}
-	channels:=make([]Channel,0,len(data.Channels)+len(installedProviders.Channels))
+	public:=publicBroadcasterChannels()
+	if len(installedProviders.Channels)==0 && len(public)==0{return data}
+	channels:=make([]Channel,0,len(data.Channels)+len(installedProviders.Channels)+len(public))
 	channels=append(channels,data.Channels...)
 	for _,ch:=range installedProviders.Channels{channels=append(channels,ch)}
+	channels=append(channels,public...)
 	data.Channels=channels
 	return data
 }
 func externalProviderChannel(id string)(Channel,bool){
+	if ch,ok:=publicBroadcasterChannel(id);ok{return ch,true}
 	if !installedProviders.IDs[id]{return Channel{},false}
 	for _,ch:=range installedProviders.Channels{if ch.ID==id{return ch,true}}
 	return Channel{},false

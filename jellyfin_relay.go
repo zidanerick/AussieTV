@@ -356,6 +356,7 @@ func relayDiagnostics(w http.ResponseWriter, _ *http.Request, cfg jellyfinConfig
 		"programmeArtworkMisses":      misses,
 		"programmeArtworkPending":     pending,
 		"additionalProviderChannels": len(installedProviders.Channels),
+		"publicBroadcasters": publicBroadcasterReport(),
 		"jellyfinArtworkSync": getArtworkSyncReport(),
 		"events":                      tuneEvents(),
 		"recentFailures": recentTuneFailures(),
