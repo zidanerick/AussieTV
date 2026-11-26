@@ -22,4 +22,6 @@ ENV XDG_CACHE_HOME=/data \
     AUSSIETV_JELLYFIN_REGION=Melbourne
 WORKDIR /data
 EXPOSE 45781 45782
+STOPSIGNAL SIGTERM
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 CMD ["/usr/local/bin/aussietv", "--healthcheck"]
 ENTRYPOINT ["/usr/local/bin/aussietv"]

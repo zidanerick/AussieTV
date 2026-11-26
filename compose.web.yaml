@@ -2,6 +2,12 @@ services:
   aussietv:
     image: ${AUSSIETV_IMAGE:-ghcr.io/zidanerick/aussietv:experimental-v0.1.0-beta.1}
     restart: unless-stopped
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     ports:
       - "${AUSSIETV_HOST_BIND:-127.0.0.1}:45781:45781"
     environment:

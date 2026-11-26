@@ -22,6 +22,8 @@ func TestDockerWebConfigAndIsolation(t *testing.T) {
 		code int
 	}{
 		{"GET","/api/channels","tv.example.test","","",false,401},
+		{"GET","/api/health","tv.example.test","","",false,401},
+		{"GET","/api/health","tv.example.test","","",true,200},
 		{"GET","/api/channels","evil.test","","",true,403},
 		{"GET","/api/channels","tv.example.test","https://evil.test","",true,403},
 		{"GET","/hls","tv.example.test","","cross-site",true,403},

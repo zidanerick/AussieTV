@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -26,6 +27,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -668,7 +670,7 @@ func hlsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := mediaClient.Do(req)
 	if err != nil {
-		log.Printf("stream error %s: %v", id, err)
+		log.Print("stream request failed (network or provider restriction)")
 		http.Error(w, "Stream unavailable (network or provider restriction)", 502)
 		return
 	}
@@ -769,6 +771,11 @@ func openBrowser(addr string) error {
 }
 
 func prepareLogging() {
+	if os.Getenv("AUSSIETV_MODE") == "server" {
+		log.SetOutput(os.Stdout)
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
+		return
+	}
 	path := ""
 	if base, err := os.UserCacheDir(); err == nil {
 		path = filepath.Join(base, "AussieTV", "startup.log")
@@ -887,6 +894,13 @@ func initTeletext() error {
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--healthcheck" {
+		if err := serverHealthcheck(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if code, handled := maybeRunFirewallHelper(os.Args); handled {
 		os.Exit(code)
 	}
@@ -1042,6 +1056,18 @@ func main() {
 			time.Sleep(200 * time.Millisecond)
 			if err := openBrowser(addr); err != nil {
 				log.Printf("Could not open browser: %v", err)
+			}
+		}()
+	}
+	if serverMode {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		go func() {
+			<-ctx.Done()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := server.Shutdown(shutdownCtx); err != nil {
+				_ = server.Close()
 			}
 		}()
 	}

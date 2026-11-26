@@ -101,7 +101,29 @@ jobs:
             sleep 1
           done
           grep -qx ok /tmp/feed-health
+          docker exec tv-web /usr/local/bin/aussietv --healthcheck
+          docker exec tv-feed /usr/local/bin/aussietv --healthcheck
+          docker stop -t 15 tv-web tv-feed
+          test "$(docker inspect -f '{{.State.ExitCode}}' tv-web)" = 0
+          test "$(docker inspect -f '{{.State.ExitCode}}' tv-feed)" = 0
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:45782/jellyfin/health)" = 401
+      - name: Test combined Compose deployment
+        shell: bash
+        env:
+          AUSSIETV_IMAGE: aussietv:ci
+          AUSSIETV_WEB_PASSWORD: ci-test-password-1234567890
+          AUSSIETV_JELLYFIN_KEY: ci-feed-key-1234567890123456
+          AUSSIETV_JELLYFIN_BASE_URL: http://127.0.0.1:45782
+          DOCKER_DEFAULT_PLATFORM: linux/${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          export COMPOSE_PROJECT_NAME=aussietv-ci
+          trap 'docker compose -f compose.web.yaml -f compose.jellyfin.yaml down -v' EXIT
+          docker compose -f compose.web.yaml -f compose.jellyfin.yaml up -d --wait --wait-timeout 120
+          docker compose -f compose.web.yaml -f compose.jellyfin.yaml exec -T aussietv /usr/local/bin/aussietv --healthcheck
+          docker compose -f compose.web.yaml -f compose.jellyfin.yaml exec -T aussietv sh -c 'test "$(id -u)" = 10001 && touch /data/ci-write-test && rm /data/ci-write-test'
+          curl -fsS -u viewer:ci-test-password-1234567890 http://127.0.0.1:45781/api/health | grep -qx ok
+          curl -fsS 'http://127.0.0.1:45782/jellyfin/health?key=ci-feed-key-1234567890123456' | grep -qx ok
       - name: Export tested container
         run: |
           mkdir -p dist/docker
@@ -123,18 +145,33 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: AussieTV-experimental-Docker-*
+          path: dist/tested
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish experimental multi-architecture image
+      - name: Publish the exact tested architecture images
         shell: bash
         run: |
           set -euo pipefail
           tag="$(tr -d '\r\n' < RELEASE_VERSION)"
-          docker buildx build --platform linux/amd64,linux/arm64 --push \
-            -t "ghcr.io/zidanerick/aussietv:experimental-$tag" \
-            -t "ghcr.io/zidanerick/aussietv:sha-${GITHUB_SHA}" .
+          repo=ghcr.io/zidanerick/aussietv
+          for arch in amd64 arm64; do
+            dir="dist/tested/AussieTV-experimental-Docker-$arch"
+            (cd "$dir" && sha256sum -c SHA256SUMS)
+            docker load -i "$dir/aussietv-linux-$arch.tar.gz"
+            test "$(docker image inspect -f '{{.Architecture}}' aussietv:ci)" = "$arch"
+            docker tag aussietv:ci "$repo:sha-$GITHUB_SHA-$arch"
+            docker push "$repo:sha-$GITHUB_SHA-$arch"
+            docker image rm aussietv:ci
+          done
+          docker buildx imagetools create \
+            -t "$repo:sha-$GITHUB_SHA" \
+            -t "$repo:experimental-$tag" \
+            "$repo:sha-$GITHUB_SHA-amd64" "$repo:sha-$GITHUB_SHA-arm64"
+          docker buildx imagetools inspect "$repo:sha-$GITHUB_SHA"

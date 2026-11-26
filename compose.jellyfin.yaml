@@ -1,0 +1,12 @@
+# Combine with compose.web.yaml for browser TV and Jellyfin on one container.
+services:
+  aussietv:
+    ports:
+      - "${AUSSIETV_FEED_HOST_BIND:-127.0.0.1}:45782:45782"
+    environment:
+      AUSSIETV_JELLYFIN_BIND: 0.0.0.0:45782
+      AUSSIETV_JELLYFIN_BASE_URL: ${AUSSIETV_JELLYFIN_BASE_URL:?Set the URL reachable by Jellyfin}
+      AUSSIETV_JELLYFIN_KEY: ${AUSSIETV_JELLYFIN_KEY:?Set a long random key}
+      AUSSIETV_JELLYFIN_REGION: ${AUSSIETV_JELLYFIN_REGION:-Melbourne}
+      AUSSIETV_JELLYFIN_STREAM_MODE: ${AUSSIETV_JELLYFIN_STREAM_MODE:-redirect}
+      AUSSIETV_TELETEXT_VIDEO: ${AUSSIETV_TELETEXT_VIDEO:-0}

@@ -73,6 +73,11 @@ func (c *dockerWebConfig) handler(next http.Handler) http.Handler {
 		}
 		// Explicit allow-list: no desktop management or playlist downloads.
 		switch r.URL.Path {
+		case "/api/health":
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			if r.Method == http.MethodGet { _, _ = w.Write([]byte("ok\n")) }
+			return
 		case "/":
 			body, err := assets.ReadFile("static/index.html")
 			if err != nil { http.Error(w, "Application asset missing", 500); return }
@@ -81,6 +86,10 @@ func (c *dockerWebConfig) handler(next http.Handler) http.Handler {
 			if r.Method == http.MethodGet { _, _ = w.Write(body) }
 			return
 		case "/api/channels", "/api/artwork", "/api/logo", "/hls", "/app-icon.svg", "/aussietv-logo.svg", "/remote.js", "/favicon.ico", "/favicon-32.png", "/favicon-192.png", "/site.webmanifest", "/channel-logo-abc-news.svg", "/channel-logo-sbs.svg", "/channel-logo-sbs2.svg", "/channel-logo-sbs-world-movies.svg", "/channel-logo-sbs-food.svg", "/channel-logo-nitv.svg":
+			if r.URL.Path == "/hls" {
+				// Upstream media is not trusted to execute as same-origin HTML.
+				w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
+			}
 			next.ServeHTTP(w,r)
 		default:
 			if strings.HasPrefix(r.URL.Path,"/teletext/") { next.ServeHTTP(w,r); return }
