@@ -887,6 +887,12 @@ func initTeletext() error {
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--discord-activity" {
+		if err := runDiscordActivity(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if code, handled := maybeRunFirewallHelper(os.Args); handled {
 		os.Exit(code)
 	}

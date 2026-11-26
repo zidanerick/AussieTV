@@ -15,9 +15,11 @@ not platform expansion. Current optional integrations:
 ## Deferred until core bugs are addressed
 
 - Docker-hosted full browser TV interface and multi-user authentication.
-- Linux and macOS desktop packaging and platform-native tray integrations.
+- macOS desktop packaging and platform-native Linux/macOS tray integrations.
 - Dedicated Jellyfin plugin, DVR optimisation, stable remote hardware control.
 
 Keep authenticated feeds behind a private-network firewall. Do not turn the
 Windows desktop's loopback-only HTTP service into a public network server.
 Start with [Jellyfin setup](JELLYFIN.md) and [known issues](BETA-KNOWN-ISSUES.md).
+
+Experimental CI previews: [Linux portable](LINUX.md) and [Discord Activity](DISCORD.md). Neither changes the Windows release gate.

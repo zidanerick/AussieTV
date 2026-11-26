@@ -1,0 +1,116 @@
+name: Experimental Linux and Discord builds
+
+on:
+  push:
+    branches: [main, experimental/linux-discord-builds]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test core and build Linux packages
+        run: |
+          go run ./tools/iconbuilder
+          go test ./... -count=1
+          go vet ./...
+          node --test tests/*.test.cjs
+          bash tools/build-linux.sh amd64
+          bash tools/build-linux.sh arm64
+      - name: Smoke test Linux x64 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'if [ -n "${pid:-}" ]; then kill "$pid" 2>/dev/null || true; fi; rm -rf "$tmp"' EXIT
+          tar -xzf dist/linux/*-linux-x64.tar.gz -C "$tmp"
+          export XDG_CONFIG_HOME="$tmp/config" XDG_CACHE_HOME="$tmp/cache" AUSSIE_TV_NO_BROWSER=1
+          "$tmp"/AussieTV-*/aussietv > "$tmp/log" 2>&1 &
+          pid=$!
+          for i in {1..50}; do
+            if curl -fsS http://127.0.0.1:45781/ > "$tmp/index"; then break; fi
+            kill -0 "$pid" || { cat "$tmp/log"; exit 1; }
+            sleep .2
+          done
+          grep -qi AussieTV "$tmp/index"
+          curl -fsS http://127.0.0.1:45781/app-icon.svg >/dev/null
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: evil.invalid' http://127.0.0.1:45781/)" = 403
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Origin: https://evil.invalid' http://127.0.0.1:45781/)" = 403
+          curl -fsS -X POST http://127.0.0.1:45781/api/quit
+          wait "$pid"
+          pid=
+          (cd dist/linux && sha256sum -c *.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AussieTV-experimental-Linux
+          path: dist/linux/*
+          if-no-files-found: error
+          retention-days: 90
+
+  discord:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build isolated Discord Activity
+        run: |
+          go test . -run TestDiscordActivityIsolation -count=1
+          npm --prefix discord install --no-audit --no-fund
+          npm --prefix discord test
+          npm --prefix discord run build
+          mkdir -p dist/discord-preview dist/discord
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o dist/discord-preview/aussietv .
+          cp -R discord/dist dist/discord-preview/discord-web
+          cp docs/DISCORD.md dist/discord-preview/README.md
+          cp LICENSE dist/discord-preview/
+          cp discord/package-lock.json dist/discord-preview/
+          tag="$(tr -d '\r\n' < RELEASE_VERSION)"
+          name="AussieTV-Experimental-$tag-discord-linux-x64.tar.gz"
+          tar -C dist -czf "dist/discord/$name" discord-preview
+          (cd dist/discord && sha256sum "$name" > "$name.sha256")
+      - name: Smoke test Activity package and route isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'if [ -n "${pid:-}" ]; then kill "$pid" 2>/dev/null || true; fi; rm -rf "$tmp"' EXIT
+          tar -xzf dist/discord/*.tar.gz -C "$tmp"
+          AUSSIETV_DISCORD_APP_ID=123456789012345678 "$tmp/discord-preview/aussietv" --discord-activity > "$tmp/log" 2>&1 &
+          pid=$!
+          for i in {1..50}; do
+            if curl -fsS http://127.0.0.1:45783/ > "$tmp/index"; then break; fi
+            kill -0 "$pid" || { cat "$tmp/log"; exit 1; }
+            sleep .2
+          done
+          grep -qi 'Discord preview' "$tmp/index"
+          curl -fsS http://127.0.0.1:45783/app.js >/dev/null
+          curl -fsS http://127.0.0.1:45783/.proxy/api/config | grep -q 123456789012345678
+          for route in /api/settings /hls /channel.m3u /api/quit /.proxy/hls; do
+            test "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:45783$route")" = 404
+          done
+          (cd dist/discord && sha256sum -c *.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AussieTV-experimental-Discord-Activity
+          path: dist/discord/*
+          if-no-files-found: error
+          retention-days: 90

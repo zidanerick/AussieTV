@@ -21,3 +21,6 @@ rsrc_windows_amd64.syso
 Thumbs.db
 .vscode/
 .idea/
+
+# Discord frontend dependencies and generated bundles
+discord/node_modules/
