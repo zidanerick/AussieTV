@@ -91,3 +91,34 @@ These do not measure Jellyfin's own click-to-first-picture latency.
 ## Artwork troubleshooting
 
 After updating, keep the same M3U/XMLTV URLs and run Jellyfin Refresh Guide Data after the artwork queue has populated. Check the authenticated diagnostics for programmeArtworkCached, programmeArtworkMisses and programmeArtworkPending. The guide request never blocks on TVmaze; a cold installation may need a later refresh. The cache persists if /data is mounted. Ambiguous titles, bulletins and programmes with no matching artwork deliberately remain blank. TVmaze landscape images are series backdrops, not episode stills. Jellyfin 12 imports typed backdrop art, but upstream [issue #18209](https://github.com/jellyfin/jellyfin/issues/18209) tracks missing Primary artwork from XMLTV icons. This change cannot guarantee a particular Jellyfin client displays images. Do not clear the entire Jellyfin database to refresh artwork.
+
+
+## Optional direct artwork repair (Docker server mode)
+
+Jellyfin issue #18209 documents successful direct Base64 image uploads for
+Live TV programs whose XMLTV image import failed. The opt-in repair service
+runs every two minutes, checks up to 40 missing posters per cycle, and only
+acts on the next 24 hours of listings. It requires exactly one configured
+M3U tuner and XMLTV provider, with URLs matching this AussieTV instance
+(including the feed key). It then matches unique channel name/number and
+exact programme title, UTC start and UTC end. Existing images are skipped;
+no library, recording, channel or server configuration is modified.
+
+In Jellyfin Dashboard > API Keys, create a dedicated administrator API key.
+Set the following variables on the AussieTV container:
+
+    AUSSIETV_JELLYFIN_ARTWORK_SYNC=1
+    AUSSIETV_JELLYFIN_SERVER_URL=http://YOUR-JELLYFIN-SERVER:8096
+    AUSSIETV_JELLYFIN_API_KEY=YOUR-JELLYFIN-API-KEY
+
+Prefer HTTPS. The key has broad server permissions; restrict the container
+to trusted hosts and revoke the key if no longer used. The optional
+AUSSIETV_JELLYFIN_API_KEY_FILE can replace the environment key with a mounted
+secret file. The service never follows API redirects or forwards the API key
+to artwork hosts. Do not enable on a multi-tuner server; it fails closed.
+After refreshing Jellyfin guide data, let the artwork cache populate.
+The keyed diagnostics endpoint reports jellyfinArtworkSync status, matched,
+existing, uploaded, verified (HEAD 200) and failed counts for the last pass.
+These are not proof of display in every client. A title without confidently
+matched TVmaze artwork remains blank. Disable with SYNC=0; this does not
+delete any images already repaired.

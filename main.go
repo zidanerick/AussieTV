@@ -958,6 +958,14 @@ func main() {
 		warmCtx, stopWarm := context.WithCancel(context.Background())
 		defer stopWarm()
 		go warmProgrammeArtwork(warmCtx, feedCfg.Region)
+		if syncCfg, err := artworkSyncFromEnv(feedCfg); err != nil {
+			log.Printf("Jellyfin artwork sync disabled: %v",err)
+			artworkSyncStatus.Lock()
+			artworkSyncStatus.report.Status=err.Error()
+			artworkSyncStatus.Unlock()
+		} else if syncCfg != nil {
+			go syncCfg.run(warmCtx)
+		}
 	}
 	log.Printf("AussieTV v%s starting on %s/%s", version, runtime.GOOS, runtime.GOARCH)
 	mux := http.NewServeMux()

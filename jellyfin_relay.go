@@ -303,6 +303,7 @@ func relayDiagnostics(w http.ResponseWriter, _ *http.Request, cfg jellyfinConfig
 		"programmeArtworkCached":      posters,
 		"programmeArtworkMisses":      misses,
 		"programmeArtworkPending":     pending,
+		"jellyfinArtworkSync": getArtworkSyncReport(),
 		"events":                      tuneEvents(),
 		"relayManifestRequests":       relayManifestRequests.Load(),
 		"relayMediaRequests":          relayMediaRequests.Load(),
