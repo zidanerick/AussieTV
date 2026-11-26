@@ -164,7 +164,12 @@ func serveJellyfinMPEGTS(w http.ResponseWriter, r *http.Request, cfg jellyfinCon
 	input := base + "/jellyfin/hls/" + id + ".m3u8?key=" + url.QueryEscape(cfg.Key)
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	command := exec.CommandContext(ctx, ffmpeg, mpegTSFFmpegArgs(input)...)
+	args := mpegTSFFmpegArgs(input)
+	if cfg.StreamMode == "fast-tune" {
+		// Emit PAT/PMT at video random-access points for safe shared joins.
+		args = append(args[:len(args)-2], append([]string{"-mpegts_flags","+resend_headers"},args[len(args)-2:]...)...)
+	}
+	command := exec.CommandContext(ctx, ffmpeg, args...)
 	ffmpegexec.Configure(command)
 	stdout, err := command.StdoutPipe()
 	if err != nil {
@@ -210,6 +215,7 @@ func serveJellyfinMPEGTS(w http.ResponseWriter, r *http.Request, cfg jellyfinCon
 		initial.Write(packet)
 		inspected.add(packet)
 		if audioTimer == nil {
+			if cfg.StreamMode == "fast-tune" { recordTune(ch.ID,"fast-tune-first-packet",200,time.Since(start),0) }
 			audioTimer = time.AfterFunc(5*time.Second, func() { audioExpired.Store(true); cancel() })
 		}
 		if inspected.audioReady() {

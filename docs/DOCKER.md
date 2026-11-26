@@ -76,7 +76,7 @@ TV and match its origin exactly. Keep Jellyfin's port on a private network.
 | AUSSIETV_JELLYFIN_BASE_URL | http://YOUR_UNRAID_IP:45782 (if feed enabled) |
 | AUSSIETV_JELLYFIN_KEY | random secret, at least 24 characters |
 | AUSSIETV_JELLYFIN_REGION | Melbourne (or another supported region) |
-| AUSSIETV_JELLYFIN_STREAM_MODE | redirect (recommended) |
+| AUSSIETV_JELLYFIN_STREAM_MODE | redirect (recommended); fast-tune experimental |
 
 Run `openssl rand -hex 24` twice for separate secrets. Set extra parameters
 `--read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m`

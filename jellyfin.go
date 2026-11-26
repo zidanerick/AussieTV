@@ -37,7 +37,7 @@ func jellyfinConfigFromEnv() (jellyfinConfig, bool, error) {
 	}
 	cfg := jellyfinConfig{Bind: bind, BaseURL: strings.TrimRight(strings.TrimSpace(os.Getenv("AUSSIETV_JELLYFIN_BASE_URL")), "/"), Key: strings.TrimSpace(os.Getenv("AUSSIETV_JELLYFIN_KEY")), Region: safeRegion(strings.TrimSpace(os.Getenv("AUSSIETV_JELLYFIN_REGION"))), Discovery: os.Getenv("AUSSIETV_HDHR_DISCOVERY") == "1", StreamMode: strings.ToLower(strings.TrimSpace(os.Getenv("AUSSIETV_JELLYFIN_STREAM_MODE")))}
 	if !validStreamMode(cfg.StreamMode) {
-		return cfg, true, errors.New("AUSSIETV_JELLYFIN_STREAM_MODE must be redirect, relay, or mpegts")
+		return cfg, true, errors.New("AUSSIETV_JELLYFIN_STREAM_MODE must be redirect, relay, mpegts, or fast-tune")
 	}
 	if cfg.Discovery && !strings.HasPrefix(cfg.Bind, "0.0.0.0:") {
 		return cfg, true, errors.New("HDHomeRun discovery requires a LAN Jellyfin bind")
@@ -56,14 +56,16 @@ func jellyfinConfigFromEnv() (jellyfinConfig, bool, error) {
 }
 
 func validStreamMode(s string) bool {
-	return s == "" || s == "redirect" || s == "relay" || s == "mpegts"
+	return s == "" || s == "redirect" || s == "relay" || s == "mpegts" || s == "fast-tune"
 }
 func effectiveStreamMode(s string) string {
-	if s == "relay" || s == "mpegts" {
+	if s == "relay" || s == "mpegts" || s == "fast-tune" {
 		return s
 	}
 	return "redirect"
 }
+
+func usesMPEGTS(mode string) bool { return mode == "mpegts" || mode == "fast-tune" }
 
 func xmlTVID(region string, ch Channel) string {
 	return "aussietv." + strings.ToLower(region) + "." + base64.RawURLEncoding.EncodeToString([]byte(ch.ID))
@@ -102,7 +104,7 @@ func m3uFeed(channels []Channel, cfg jellyfinConfig) string {
 		fmt.Fprintf(&w, "#EXTINF:-1 tvg-id=\"%s\" tvg-name=\"%s\" tvg-chno=\"%s\" tvg-logo=\"%s\" group-title=\"%s\",%s\n",
 			singleLine(id), singleLine(ch.Name), singleLine(ch.Number), logo, singleLine(ch.Network), singleLine(ch.Name))
 		ext := ".m3u8"
-		if effectiveStreamMode(cfg.StreamMode) == "mpegts" {
+		if usesMPEGTS(cfg.StreamMode) {
 			ext = ".ts"
 		}
 		fmt.Fprintf(&w, "%s/jellyfin/stream/%s%s?key=%s\n", cfg.BaseURL, base64.RawURLEncoding.EncodeToString([]byte(ch.ID)), ext, url.QueryEscape(cfg.Key))
@@ -174,6 +176,13 @@ func xmltvFeed(channels []Channel, region string) ([]byte, error) {
 // newJellyfinHandler has its own mux with no desktop APIs. It never accepts
 // arbitrary URLs to fetch, preventing it from becoming a public proxy.
 func newJellyfinHandler(cfg jellyfinConfig, load func(string) ChannelData) http.Handler {
+	return newJellyfinHandlerWithPool(cfg,load,nil)
+}
+
+func newJellyfinHandlerWithPool(cfg jellyfinConfig, load func(string) ChannelData, pool *fastTunePool) http.Handler {
+	if cfg.StreamMode == "fast-tune" && pool == nil {
+		pool = newFastTunePool(func(w http.ResponseWriter,r *http.Request,ch Channel){ serveJellyfinMPEGTS(w,r,cfg,ch) })
+	}
 	mux := http.NewServeMux()
 	if teletextService != nil {
 		mux.Handle("GET /teletext/", teletextService.Handler())
@@ -214,7 +223,7 @@ func newJellyfinHandler(cfg jellyfinConfig, load func(string) ChannelData) http.
 				// Jellyfin may probe sources using HEAD before it opens a channel.
 				// Do not forward that probe or redirect it to an HLS origin:
 				// some origins hold HEAD requests until Jellyfin's timeout.
-				if effectiveStreamMode(cfg.StreamMode) == "mpegts" {
+				if usesMPEGTS(cfg.StreamMode) {
 					w.Header().Set("Content-Type", "video/mp2t")
 				} else {
 					w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
@@ -224,7 +233,11 @@ func newJellyfinHandler(cfg jellyfinConfig, load func(string) ChannelData) http.
 					recordTune(ch.ID, "head", http.StatusOK, time.Since(started), 0)
 					return
 				}
-				if effectiveStreamMode(cfg.StreamMode) == "mpegts" {
+				if cfg.StreamMode == "fast-tune" {
+					pool.serve(w,r,ch)
+					return
+				}
+				if usesMPEGTS(cfg.StreamMode) {
 					serveJellyfinMPEGTS(w, r, cfg, ch)
 					return
 				}
@@ -245,7 +258,7 @@ func newJellyfinHandler(cfg jellyfinConfig, load func(string) ChannelData) http.
 	// Only the copy-only MPEG-TS process uses this root playlist. Its nested
 	// segment URLs are rewritten through the protected media relay.
 	mux.HandleFunc("GET /jellyfin/hls/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if effectiveStreamMode(cfg.StreamMode) != "mpegts" || !strings.HasSuffix(r.PathValue("id"), ".m3u8") {
+		if !usesMPEGTS(cfg.StreamMode) || !strings.HasSuffix(r.PathValue("id"), ".m3u8") {
 			http.NotFound(w, r)
 			return
 		}
@@ -267,7 +280,7 @@ func newJellyfinHandler(cfg jellyfinConfig, load func(string) ChannelData) http.
 	})
 	mediaHandler := func(w http.ResponseWriter, r *http.Request) {
 		id, err := base64.RawURLEncoding.DecodeString(r.PathValue("id"))
-		if err != nil || len(id) == 0 || len(id) > 512 || (effectiveStreamMode(cfg.StreamMode) != "relay" && effectiveStreamMode(cfg.StreamMode) != "mpegts") {
+		if err != nil || len(id) == 0 || len(id) > 512 || (effectiveStreamMode(cfg.StreamMode) != "relay" && !usesMPEGTS(cfg.StreamMode)) {
 			http.NotFound(w, r)
 			return
 		}
@@ -281,7 +294,7 @@ func newJellyfinHandler(cfg jellyfinConfig, load func(string) ChannelData) http.
 				return
 			}
 			local := cfg
-			if effectiveStreamMode(cfg.StreamMode) == "mpegts" {
+			if usesMPEGTS(cfg.StreamMode) {
 				local.BaseURL = localJellyfinURL(cfg)
 			}
 			relayPlaylistOrSegment(w, r, local, ch, remote)

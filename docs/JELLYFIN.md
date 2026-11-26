@@ -37,6 +37,7 @@ The bearer key is embedded in both URLs and must be kept private.
 | `redirect` | Jellyfin opens the broadcaster HLS URL | **Default**; reported working, sometimes 6-11 s startup |
 | `relay` | Authenticated HLS playlist and segments through AussieTV | Experimental; network dependent |
 | `mpegts` | FFmpeg copies HLS video and audio to continuous MPEG-TS | Experimental; SBS audio may be missing or fail startup |
+| `fast-tune` | Shared on-demand copy-only MPEG-TS with bounded rolling media | Experimental; warm joins only, real broadcaster/Jellyfin performance unverified |
 
 Ordinary TV playback does not require FFmpeg. The setup wizard optionally
 fetches FFmpeg and checks its published SHA-256. From the Start Menu choose
@@ -68,3 +69,23 @@ prove live SBS audio or Jellyfin stability.
 
 Known problems: [BETA-KNOWN-ISSUES.md](BETA-KNOWN-ISSUES.md). See
 [JELLYFIN-BENCHMARK.md](JELLYFIN-BENCHMARK.md) for a repeatable Web benchmark.
+
+
+## Experimental fast tune
+
+Set AUSSIETV_JELLYFIN_STREAM_MODE=fast-tune and refresh the M3U tuner (TS
+URLs rather than HLS). Keep redirect as the reliable fallback. Fast tune
+shares the existing validated FFmpeg relay between readers of the same
+channel. Each channel retains approximately 6 MiB of TS packets, allows up
+to eight readers and stays active for 20 seconds after the last disconnect.
+At most four channel sessions run concurrently. Slow clients that fall
+behind the ring are disconnected rather than accumulating memory. Joins
+wait for a PAT, video random-access signalling and audio; this is not a
+guarantee of decodability on all clients. No background prewarming, no
+re-encoding, and no relaxed upstream URL/authentication rules.
+
+Cold starts still pay FFmpeg input preparation costs. Compare cold and
+repeat tune times separately. Authenticated diagnostics include
+fastTuneSessionsStarted, fastTuneSessionReuses, fastTuneLagDrops,
+fast-tune-first-packet and fast-tune-cold/shared response timings.
+These do not measure Jellyfin's own click-to-first-picture latency.

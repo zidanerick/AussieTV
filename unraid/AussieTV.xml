@@ -24,5 +24,5 @@
   <Config Name="Jellyfin Base URL" Target="AUSSIETV_JELLYFIN_BASE_URL" Default="" Mode="" Description="URL reachable by Jellyfin, no trailing path or query." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
   <Config Name="Jellyfin Key" Target="AUSSIETV_JELLYFIN_KEY" Default="" Mode="" Description="Separate random secret of at least 24 characters." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="Jellyfin Region" Target="AUSSIETV_JELLYFIN_REGION" Default="Melbourne" Mode="" Description="Region used by Jellyfin M3U and XMLTV." Type="Variable" Display="advanced" Required="false" Mask="false">Melbourne</Config>
-  <Config Name="Jellyfin Transport" Target="AUSSIETV_JELLYFIN_STREAM_MODE" Default="redirect" Mode="" Description="redirect recommended; relay and mpegts are experimental." Type="Variable" Display="advanced" Required="false" Mask="false">redirect</Config>
+  <Config Name="Jellyfin Transport" Target="AUSSIETV_JELLYFIN_STREAM_MODE" Default="redirect" Mode="" Description="redirect recommended; relay, mpegts and fast-tune are experimental." Type="Variable" Display="advanced" Required="false" Mask="false">redirect</Config>
 </Container>
