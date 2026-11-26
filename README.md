@@ -53,14 +53,14 @@ go run ./tools/iconbuilder
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w -H=windowsgui' -o AussieTV.exe .
 ```
 
-A GitHub Actions Windows release workflow additionally compiles a portable ZIP and a real Inno Setup installer, including an optional FFmpeg setup page. The supported release remains Windows-only. Separate experimental Linux and Discord Activity builds are available as CI artifacts; macOS and a full Docker-hosted interactive UI remain deferred. The existing feed-only Docker proof of concept is experimental, not a supported release.
+A GitHub Actions Windows release workflow additionally compiles a portable ZIP and a real Inno Setup installer, including an optional FFmpeg setup page. The supported release remains Windows-only. Separate experimental Linux and Docker builds are available as CI artifacts; macOS remains deferred.
 
-## Experimental platform builds
+## Experimental builds
 
-- [Linux x64 and ARM64](docs/LINUX.md): portable archives, existing local TV interface and optional system FFmpeg. No native tray yet.
-- [Discord Activity](docs/DISCORD.md): isolated regional programme guide and official broadcaster links; no in-Discord video or watch-party synchronization yet.
+- [Linux x64 and ARM64](docs/LINUX.md): portable archives and the local TV UI.
+- [Docker x64 and ARM64](docs/DOCKER.md): Jellyfin feed and optional authenticated browser TV; FFmpeg included.
 
-Both are built by [Experimental Linux and Discord builds](https://github.com/zidanerick/AussieTV/actions/workflows/experimental-builds.yml). Download the artifacts from a successful run. The existing Windows prerelease is unchanged.
+Download tested archives from [GitHub Actions](https://github.com/zidanerick/AussieTV/actions/workflows/experimental-builds.yml). The container registry publish job runs on main only after tests pass. These builds do not modify the existing Windows release.
 
 ## Data providers and privacy
 

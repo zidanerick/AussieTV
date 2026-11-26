@@ -20,4 +20,4 @@ firewall rules and disabled state; EPG artwork, subtitles, TV remote navigation;
 Jellyfin client audio/video stability; and packaging on real Windows PCs.
 
 Do not put signed stream URLs, feed keys, private IPs or personal logs in public
-issues. Future Linux/macOS/full Docker UI work stays out of the Windows beta gate.
+issues. Experimental Linux and Docker builds stay out of the Windows beta gate; macOS is deferred. Docker LAN playback and HTTPS proxy setup are unverified on real deployments.

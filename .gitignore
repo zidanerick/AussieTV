@@ -22,5 +22,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Discord frontend dependencies and generated bundles
-discord/node_modules/
+# Local deployment secrets
+.env
+.env.*

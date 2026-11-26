@@ -1,0 +1,23 @@
+services:
+  aussietv:
+    image: ${AUSSIETV_IMAGE:-ghcr.io/zidanerick/aussietv:experimental-v0.1.0-beta.1}
+    restart: unless-stopped
+    ports:
+      - "${AUSSIETV_HOST_BIND:-127.0.0.1}:45781:45781"
+    environment:
+      AUSSIETV_MODE: server
+      AUSSIETV_WEB_BIND: 0.0.0.0:45781
+      AUSSIETV_WEB_ORIGIN: ${AUSSIETV_WEB_ORIGIN:-http://127.0.0.1:45781}
+      AUSSIETV_WEB_USER: ${AUSSIETV_WEB_USER:-viewer}
+      AUSSIETV_WEB_PASSWORD: ${AUSSIETV_WEB_PASSWORD:?Set a random password of at least 24 characters}
+      AUSSIETV_JELLYFIN_BIND: ""
+    volumes:
+      - aussietv-cache:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  aussietv-cache:

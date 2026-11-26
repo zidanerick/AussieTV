@@ -887,12 +887,6 @@ func initTeletext() error {
 }
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "--discord-activity" {
-		if err := runDiscordActivity(); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
 	if code, handled := maybeRunFirewallHelper(os.Args); handled {
 		os.Exit(code)
 	}
@@ -902,12 +896,16 @@ func main() {
 	}
 
 	serverMode := os.Getenv("AUSSIETV_MODE") == "server"
+	webCfg, err := dockerWebConfigFromEnv(serverMode)
+	if err != nil {
+		startupFailure(err)
+	}
 	feedCfg, envEnabled, feedErr := jellyfinConfigFromEnv()
 	if feedErr != nil {
 		startupFailure(feedErr)
 	}
-	if serverMode && !envEnabled {
-		startupFailure(errors.New("server mode requires configured Jellyfin feed credentials"))
+	if serverMode && !envEnabled && webCfg == nil {
+		startupFailure(errors.New("server mode requires configured Jellyfin feed credentials or authenticated web UI"))
 	}
 	supervisor := &feedSupervisor{}
 	defer supervisor.Close()
@@ -986,8 +984,12 @@ func main() {
 			_ = server.Shutdown(ctx)
 		}()
 	})
-	listener, err := net.Listen("tcp", "127.0.0.1:45781")
-	if err != nil {
+	bind := "127.0.0.1:45781"
+	if webCfg != nil {
+		bind = webCfg.bind
+	}
+	listener, err := net.Listen("tcp", bind)
+	if err != nil && webCfg == nil {
 		log.Printf("Port 45781 unavailable (%v); trying a free port", err)
 		listener, err = net.Listen("tcp", "127.0.0.1:0")
 	}
@@ -1012,6 +1014,11 @@ func main() {
 		}
 		mux.ServeHTTP(w, r)
 	}), ReadHeaderTimeout: 10 * time.Second}
+	if webCfg != nil {
+		server.Handler = webCfg.handler(mux)
+		server.IdleTimeout = 60 * time.Second
+		server.MaxHeaderBytes = 1 << 16
+	}
 	addr := "http://" + listener.Addr().String()
 	log.Printf("AussieTV listening at %s", addr)
 	if !serverMode {

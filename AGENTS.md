@@ -13,9 +13,9 @@ from `RELEASE_VERSION` and the `main.go` constant until these can be unified.
   HDHomeRun discovery is optional and experimental (UDP 65001 / TCP 80).
 - Direct Jellyfin HLS redirect is the default. FFmpeg MPEG-TS, Teletext video,
   and HDHomeRun auto-discovery are experimental and can fail on real sources.
-- macOS and full Docker-served browser UI are **deferred**. Linux portable
-  and Discord Activity previews are experimental CI artifacts, not supported
-  beta releases. Discord exposes only an isolated guide and official links.
+- macOS remains deferred. Linux and Docker are experimental CI targets.
+  Docker retains feed-only mode and offers an explicitly configured authenticated
+  browser UI without desktop management endpoints.
 
 ## Build / packaging
 
