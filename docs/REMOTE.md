@@ -1,6 +1,4 @@
-> **Version note (v0.1.0-beta.1):** This document may describe pre-beta v1.x/v2.x prototypes. Current Windows beta status and support boundaries are in [README](../README.md) and [Known issues](BETA-KNOWN-ISSUES.md).
-
-# AussieTV v1.7.1 remote-control and browser compatibility
+# Browser remote-control and compatibility
 
 The existing TV interface can now be operated without a mouse when a remote emits keyboard events through HDMI-CEC, a Bluetooth/USB remote, a PC remote bridge or an embedded TV webview. This is a web application, not a native Samsung/LG/Android TV app. The TV OS may reserve special keys instead of delivering them to webpages.
 
@@ -27,7 +25,7 @@ Visual focus uses a high-contrast yellow outline, and an active dropdown edit ha
 
 ## Browser support and verification
 
-- **Automated evidence**: Chromium headless with simulated guide and channels, `tests/remote_browser_smoke.py`; plus Node built-in test runner, `node --test tests/remote_keys.test.cjs`; Go tests on Linux and Windows x64 cross-build.
+- **Automated evidence**: Chromium headless with simulated guide and channels, `tests/remote_browser_smoke.py`; plus Node built-in test runner, `node --test tests/remote_keys.test.cjs`; Go tests and Docker image smoke checks.
 - **Expected modern browsers**: Microsoft Edge and Google Chrome (Hls.js), Firefox (Hls.js), and Safari (native HLS where available). The UI uses standard DOM keyboard events. Actual playback depends on the browser's codecs, stream and DRM rules. Only headless Chromium navigation was exercised in this release, not all browsers.
 - **Smart-TV browsers**: standard arrows and OK may be exposed, but Back, channel, numeric and media keys may be reserved by the device. Samsung's own documentation warns that special TV remote keys are unavailable in its Web browser. For guaranteed key coverage, a native TV app or compatible keyboard/remote bridge would be needed.
 - Native `video` controls and fullscreen are browser-specific; the player includes its own controls, and fullscreen failure is reported without breaking navigation.
@@ -48,8 +46,8 @@ The Python test renders HTML in memory with mocked guide JSON, avoiding network 
 - Real hardware passes with HDMI-CEC/USB remote and TV web engines, including native key codes.
 - Firefox, Safari/WebKit and Edge manual compatibility matrix and HLS/DRM playback validation.
 - Make the programme guide more efficient with large channel counts; track focus restoration when channel data is refreshed concurrently.
-- Use an authenticated network host when Docker mode is implemented. Existing desktop-only endpoints, heartbeat and localhost security rules are *not* ready to expose to a LAN.
+- Use the authenticated Docker web origin and private HTTPS proxy; do not publish the service to the Internet.
 
-## v1.8: focus exit routes
+## Focus exit routes
 
 When a group or guide edge has no next item in the requested direction, the remote moves to a named neighboring section instead of remaining stuck. The section graph covers the sidebar, top controls, player controls, on-air actions, quick channels, guide controls and EPG. Modal Text/help retain Back-to-close. Region/caption dropdowns remain explicit OK-to-edit with Back-to-cancel. Headless Chromium with mock guide and focusable elements validates these transitions; real TV browser hardware is not yet tested.

@@ -5,28 +5,26 @@ const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = name => fs.readFileSync(path.join(root,name),'utf8');
-
-test('pre-release version is consistent and clearly marked as beta', () => {
+test('Docker is the only active distribution pipeline', () => {
   assert.equal(read('RELEASE_VERSION').trim(), 'v0.1.0-beta.1');
   assert.match(read('main.go'), /const version = "0\.1\.0-beta\.1"/);
   assert.match(read('README.md'), /early public beta/i);
-  assert.match(read('README.md'), /MPEG-TS.*not considered stable|MPEG-TS.*experimental/i);
+  assert.match(read('README.md'), /Docker-only/i);
+  for (const p of ['.github/workflows/windows-build.yml','.github/workflows/beta-release.yml','tools/build-linux.sh','installer/AussieTV.iss']) assert.equal(fs.existsSync(path.join(root,p)),false,p);
+  const workflow=read('.github/workflows/experimental-builds.yml');
+  assert.match(workflow,/arch: \[amd64, arm64\]/);
+  assert.match(workflow,/needs: \[core-tests, docker\]/);
+  assert.match(workflow,/docker-preview/);
+  assert.match(workflow,/docker load -i/);
+  assert.match(workflow,/sha-\$GITHUB_SHA/);
+  assert.doesNotMatch(workflow,/tools\/build-linux|windows-latest|gh release create/);
 });
-test('installer has a real FFmpeg choice and separate install path', () => {
-  const iss = read('installer/AussieTV.iss');
-  assert.match(iss, /CreateInputDirPage/);
-  assert.match(iss, /WizardIsTaskSelected\('ffmpeg'\)/);
-  assert.match(iss, /fetch-windows\.ps1/);
-  assert.match(iss, /DefaultDirName=\{localappdata\}/);
-  assert.match(iss, /UninstallDisplayIcon=/);
-  assert.match(read('tools/ffmpeg/fetch-windows.ps1'), /Get-FileHash -Algorithm SHA256/);
-  assert.match(read('tools/ffmpeg/fetch-windows.ps1'), /ffmpeg-location\.txt/);
-});
-test('a single beta release has portable and installer packages', () => {
-  const workflow = read('.github/workflows/beta-release.yml');
-  assert.match(workflow, /AussieTV-Portable-v0\.1\.0-beta\.1-win-x64\.zip/);
-  assert.match(workflow, /AussieTV-Setup-v0\.1\.0-beta\.1-win-x64\.exe/);
-  assert.match(workflow, /--prerelease/);
-  assert.match(workflow, /on:/);
-  assert.match(read('RELEASE_NOTES.md'), /known problems/i);
+test('headless process requires configured authentication',()=>{
+  const main=read('main.go').split('func main() {')[1];
+  assert.match(main,/AUSSIETV_MODE/);
+  assert.match(main,/webCfg==nil && !feedEnabled/);
+  assert.match(main,/Jellyfin-only mode; browser listener disabled/);
+  assert.doesNotMatch(main,/openBrowser\(|startTray\(|newSettingsController\(|\/api\/quit/);
+  assert.match(read('Dockerfile'),/USER 10001:10001/);
+  assert.match(read('Dockerfile'),/HEALTHCHECK/);
 });

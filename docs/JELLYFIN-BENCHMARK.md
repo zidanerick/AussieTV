@@ -1,14 +1,12 @@
-> **Version note (v0.1.0-beta.1):** This document may describe pre-beta v1.x/v2.x prototypes. Current Windows beta status and support boundaries are in [README](../README.md) and [Known issues](BETA-KNOWN-ISSUES.md).
-
-# Jellyfin Web timing protocol: v2.0.5 preview
+# Jellyfin Web timing protocol (Docker)
 
 **Status: no measurements of the user's live Jellyfin Web client have been made.** The 24-row CSV template is intentionally blank; do not mistake a Go/FFmpeg synthetic test for the requested real-world comparison.
 
 ## Preflight
 
-1. Keep the currently deployed tuner, authentication key, and guide provider unchanged. Make a backup of AussieTV's `settings.json` before preview testing. Run the preview separately or in a planned test slot, not at the same time on the production ports.
-2. Ensure `ffmpeg` is installed and on the PATH of the **AussieTV process**. The optional `mpegts` mode uses a copy-only H.264/AAC-to-MPEG-TS remux, **not** a video transcoder. On Windows, use your own installed FFmpeg distribution; the portable ZIP does not bundle it.
-3. Start with **Direct broadcaster redirect** and Jellyfin **Allow stream sharing enabled**. Confirm both Nickelodeon and 7two play.
+1. Keep the currently deployed tuner, authentication key, and guide provider unchanged. Back up the private container environment and persistent /data before testing. Run the preview separately or in a planned test slot, not at the same time on the production ports.
+2. Ensure `ffmpeg` is installed and on the PATH of the **AussieTV process**. The optional `mpegts` mode uses a copy-only H.264/AAC-to-MPEG-TS remux, **not** a video transcoder. FFmpeg is bundled in the Docker image.
+3. Set AUSSIETV_JELLYFIN_STREAM_MODE=redirect, recreate the container, and start and Jellyfin **Allow stream sharing enabled**. Confirm both Nickelodeon and 7two play.
 4. Use the same Jellyfin server and **the same Jellyfin Web browser/profile and playback quality** for both modes. Leave Jellyfin transcoding, hardware acceleration, and client playback options unchanged.
 5. Use the two identified channels (Nickelodeon, 7two) in the same region and channel IDs for both modes. Jellyfin must refresh the M3U tuner when the URL extension changes from `.m3u8` to `.ts`. Do not change the deployed tuner without a backup.
 
@@ -26,7 +24,7 @@ Use `benchmarks/jellyfin-web-results-template.csv` (24 blank rows). Calculate th
 2. Allow time for background TVmaze resolution, request the XML again, and find a programme with a confidently unique title such as **The Simpsons** (only if it is listed in the EPG). Verify `<programme channel="...">...<icon src="https://static.tvmaze.com/..."/></programme>` and open its exact `src` URL from the Jellyfin server/network. **Bluey** is ambiguous in TVmaze (there are distinct 2018 and 1976 series), so it is intentionally excluded by title-only matching.
 3. In Jellyfin Dashboard → Live TV, choose **Refresh Guide**. Open the programme via Jellyfin Web. If artwork is absent, query Jellyfin's program/item JSON for `ImageTags.Primary`, and `/Items/{id}/Images/Primary` if available to distinguish import from display failures. Jellyfin issue [#18209](https://github.com/jellyfin/jellyfin/issues/18209) reports that Jellyfin 12 may not persist XMLTV `<programme><icon>` into Primary images even when the XML and URL are correct. **This must not be labelled as a failed AussieTV XML export.**
 
-## Evidence gathered offline for this preview
+## Evidence gathered offline for the earlier pipeline
 
 - Synthetic FFmpeg H.264/AAC transport-stream remux (no re-encode) passed in Go integration tests, including validating output codecs with `ffprobe`.
 - FFmpeg was terminated by cancelling the HTTP client request; an active process counter returned to zero.

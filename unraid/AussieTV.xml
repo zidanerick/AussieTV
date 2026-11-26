@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Container version="2">
+  <Name>AussieTV</Name>
+  <Repository>ghcr.io/zidanerick/aussietv:experimental-v0.1.0-beta.1</Repository>
+  <Registry>https://github.com/zidanerick/AussieTV/pkgs/container/aussietv</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/zidanerick/AussieTV/issues</Support>
+  <Project>https://github.com/zidanerick/AussieTV</Project>
+  <Overview>Docker-hosted Australian TV guide and player, with an optional keyed Jellyfin M3U/XMLTV feed. Configure an HTTPS reverse proxy on a trusted private network and an exact browser origin before use. Do not expose these ports to the Internet. No bundled broadcaster subscriptions or DRM bypass.</Overview>
+  <Category>MediaApp:Video</Category>
+  <WebUI></WebUI>
+  <Icon>https://raw.githubusercontent.com/zidanerick/AussieTV/main/static/app-icon.svg</Icon>
+  <ExtraParams>--read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,noexec,nosuid,size=16m --log-opt max-size=10m --log-opt max-file=3 --stop-timeout 15</ExtraParams>
+  <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/aussietv" Mode="rw" Description="Persistent guide and artwork cache, optional provider/config files. Directory must be writable by UID/GID 10001." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/aussietv</Config>
+  <Config Name="TV Web Port" Target="45781" Default="45781" Mode="tcp" Description="Private-network HTTP backend for your HTTPS proxy. Do not port-forward." Type="Port" Display="always" Required="true" Mask="false">45781</Config>
+  <Config Name="Browser Origin" Target="AUSSIETV_WEB_ORIGIN" Default="" Mode="" Description="Required exact HTTPS origin, e.g. https://tv.example.test (no trailing slash). Set the WebUI link in Advanced View to this same URL." Type="Variable" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="TV Username" Target="AUSSIETV_WEB_USER" Default="viewer" Mode="" Description="Shared browser login username." Type="Variable" Display="always" Required="true" Mask="false">viewer</Config>
+  <Config Name="TV Password" Target="AUSSIETV_WEB_PASSWORD" Default="" Mode="" Description="Generate a unique random secret, at least 24 characters. Do not reuse your Unraid password." Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="TV Listener" Target="AUSSIETV_WEB_BIND" Default="0.0.0.0:45781" Mode="" Description="Container listener; keep the fixed port." Type="Variable" Display="advanced-hide" Required="true" Mask="false">0.0.0.0:45781</Config>
+  <Config Name="Server Mode" Target="AUSSIETV_MODE" Default="server" Mode="" Description="Headless server, no desktop browser launch." Type="Variable" Display="advanced-hide" Required="true" Mask="false">server</Config>
+  <Config Name="Jellyfin Listener" Target="AUSSIETV_JELLYFIN_BIND" Default="" Mode="" Description="Optional: set 0.0.0.0:45782 and fill in the base URL and key to enable the feed." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Jellyfin Feed Port" Target="45782" Default="" Mode="tcp" Description="Optional: map to 45782 when enabling Jellyfin. Restrict to trusted clients." Type="Port" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Jellyfin Base URL" Target="AUSSIETV_JELLYFIN_BASE_URL" Default="" Mode="" Description="URL reachable by Jellyfin, no trailing path or query." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Jellyfin Key" Target="AUSSIETV_JELLYFIN_KEY" Default="" Mode="" Description="Separate random secret of at least 24 characters." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Jellyfin Region" Target="AUSSIETV_JELLYFIN_REGION" Default="Melbourne" Mode="" Description="Region used by Jellyfin M3U and XMLTV." Type="Variable" Display="advanced" Required="false" Mask="false">Melbourne</Config>
+  <Config Name="Jellyfin Transport" Target="AUSSIETV_JELLYFIN_STREAM_MODE" Default="redirect" Mode="" Description="redirect recommended; relay, mpegts and fast-tune are experimental." Type="Variable" Display="advanced" Required="false" Mask="false">redirect</Config>
+  <Config Name="Repair Jellyfin Artwork" Target="AUSSIETV_JELLYFIN_ARTWORK_SYNC" Default="0" Mode="" Description="Set to 1 to fill missing Live TV programme posters directly. Requires AussieTV as the only tuner and guide provider." Type="Variable" Display="advanced" Required="false" Mask="false">0</Config>
+  <Config Name="Jellyfin Server URL" Target="AUSSIETV_JELLYFIN_SERVER_URL" Default="" Mode="" Description="Jellyfin server address, preferably HTTPS. Not the AussieTV feed URL." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Jellyfin Administrator API Key" Target="AUSSIETV_JELLYFIN_API_KEY" Default="" Mode="" Description="Create a dedicated Jellyfin API key for artwork repair. Distinct from the read-only feed key. Do not share." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Additional Providers File" Target="AUSSIETV_PROVIDERS_FILE" Default="" Mode="" Description="Optional local JSON manifest, e.g. /data/providers/providers.json. Only administrator-approved public HLS and local M3U/XMLTV files." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Selected Expanded Channels" Target="AUSSIETV_EXTRA_AU_CHANNELS" Default="0" Mode="" Description="Set 1 to enable the completed workbook selection (37 indexed candidates and four readiness-gated broadcasters). Existing lineup retained; playback not yet verified." Type="Variable" Display="advanced" Required="false" Mask="false">0</Config>
+  <Config Name="Teletext Config" Target="AUSSIETV_TELETEXT_CONFIG" Default="" Mode="" Description="Optional /data/teletext.json; embedded default otherwise." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Teletext Video" Target="AUSSIETV_TELETEXT_VIDEO" Default="0" Mode="" Description="Set 1 to add optional channel 995." Type="Variable" Display="advanced" Required="false" Mask="false">0</Config>
+</Container>

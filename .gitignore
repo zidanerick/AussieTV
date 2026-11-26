@@ -21,3 +21,9 @@ rsrc_windows_amd64.syso
 Thumbs.db
 .vscode/
 .idea/
+
+# Local deployment secrets
+.env
+.env.*
+
+!.env.example

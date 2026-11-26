@@ -1,0 +1,161 @@
+name: Docker build, test and publish
+
+on:
+  push:
+    branches: [main, experimental/linux-discord-builds]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: experimental-builds-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test server core and browser UI
+        run: |
+          go run ./tools/iconbuilder
+          go test ./... -count=1
+          go test -race -run 'TestPublicBroadcaster|TestSelectedLineup|TestProvider|TestNetworkGuard|TestExtraAustralian|TestFastTune|TestArtworkSync|TestArtworkDisk|TestArtworkBackdrop|TestArtworkGuide|TestJellyfinCuratedLogo' ./... -count=1
+          go vet ./...
+          python3 -m unittest discover -s tests -p 'test_unraid_template.py'
+          node --test tests/*.test.cjs
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        run: docker buildx build --platform linux/${{ matrix.arch }} --label "org.opencontainers.image.revision=$GITHUB_SHA" --load -t aussietv:ci .
+      - name: Test authenticated web UI and feed-only modes
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'docker rm -f tv-web tv-feed >/dev/null 2>&1 || true' EXIT
+          test "$(docker image inspect -f '{{.Architecture}}' aussietv:ci)" = "${{ matrix.arch }}"
+          docker run --platform linux/${{ matrix.arch }} --rm --entrypoint ffmpeg aussietv:ci -version
+          docker run -d --name tv-web --platform linux/${{ matrix.arch }} --read-only --cap-drop ALL --security-opt no-new-privileges -p 127.0.0.1:45781:45781 -e AUSSIETV_JELLYFIN_BIND= -e AUSSIETV_WEB_BIND=0.0.0.0:45781 -e AUSSIETV_WEB_ORIGIN=http://127.0.0.1:45781 -e AUSSIETV_WEB_USER=viewer -e AUSSIETV_WEB_PASSWORD=ci-test-password-1234567890 aussietv:ci
+          for i in {1..60}; do
+            if curl -fsS -u viewer:ci-test-password-1234567890 http://127.0.0.1:45781/ > /tmp/tv-index; then break; fi
+            sleep 1
+          done
+          grep -qi AussieTV /tmp/tv-index
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:45781/)" = 401
+          for path in /settings /api/settings /channel.m3u; do
+            test "$(curl -s -u viewer:ci-test-password-1234567890 -o /dev/null -w '%{http_code}' http://127.0.0.1:45781$path)" = 404
+          done
+          test "$(curl -s -u viewer:ci-test-password-1234567890 -H 'Host: evil.invalid' -o /dev/null -w '%{http_code}' http://127.0.0.1:45781/)" = 403
+          test "$(curl -s -u viewer:ci-test-password-1234567890 -H 'Origin: https://evil.invalid' -o /dev/null -w '%{http_code}' http://127.0.0.1:45781/)" = 403
+          test "$(curl -s -u viewer:ci-test-password-1234567890 -X POST -o /dev/null -w '%{http_code}' http://127.0.0.1:45781/api/quit)" = 405
+          curl -fsS -u viewer:ci-test-password-1234567890 http://127.0.0.1:45781/favicon-192.png >/dev/null
+          docker run -d --name tv-feed --platform linux/${{ matrix.arch }} --read-only --cap-drop ALL --security-opt no-new-privileges -p 127.0.0.1:45782:45782 -e AUSSIETV_JELLYFIN_BIND=0.0.0.0:45782 -e AUSSIETV_JELLYFIN_KEY=ci-feed-key-1234567890123456 -e AUSSIETV_JELLYFIN_BASE_URL=http://127.0.0.1:45782 aussietv:ci
+          for i in {1..60}; do
+            if curl -fsS 'http://127.0.0.1:45782/jellyfin/health?key=ci-feed-key-1234567890123456' > /tmp/feed-health; then break; fi
+            sleep 1
+          done
+          grep -qx ok /tmp/feed-health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:45782/jellyfin/health)" = 401
+          docker exec tv-web /usr/local/bin/aussietv --healthcheck
+          docker exec tv-feed /usr/local/bin/aussietv --healthcheck
+          # Feed-only mode must not expose a hidden unauthenticated web listener.
+          docker exec tv-feed sh -c '! wget -q -T 2 -O /dev/null http://127.0.0.1:45781/'
+          # An unconfigured image must fail closed rather than start a desktop app.
+          if docker run --rm -e AUSSIETV_MODE=desktop aussietv:ci; then exit 1; fi
+          docker stop -t 15 tv-web tv-feed
+          test "$(docker inspect -f '{{.State.ExitCode}}' tv-web)" = 0
+          test "$(docker inspect -f '{{.State.ExitCode}}' tv-feed)" = 0
+      - name: Test combined Compose deployment
+        shell: bash
+        env:
+          AUSSIETV_IMAGE: aussietv:ci
+          AUSSIETV_WEB_PASSWORD: ci-test-password-1234567890
+          AUSSIETV_JELLYFIN_KEY: ci-feed-key-1234567890123456
+          AUSSIETV_JELLYFIN_BASE_URL: http://127.0.0.1:45782
+          DOCKER_DEFAULT_PLATFORM: linux/${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          export COMPOSE_PROJECT_NAME=aussietv-ci
+          trap 'docker compose -f compose.web.yaml -f compose.jellyfin.yaml down -v' EXIT
+          docker compose -f compose.web.yaml -f compose.jellyfin.yaml up -d --wait --wait-timeout 120
+          docker compose -f compose.web.yaml -f compose.jellyfin.yaml exec -T aussietv /usr/local/bin/aussietv --healthcheck
+          docker compose -f compose.web.yaml -f compose.jellyfin.yaml exec -T aussietv sh -c 'test "$(id -u)" = 10001 && touch /data/ci-write-test && rm /data/ci-write-test'
+          curl -fsS -u viewer:ci-test-password-1234567890 http://127.0.0.1:45781/api/health | grep -qx ok
+          curl -fsS 'http://127.0.0.1:45782/jellyfin/health?key=ci-feed-key-1234567890123456' | grep -qx ok
+      - name: Export tested container
+        run: |
+          mkdir -p dist/docker
+          docker save aussietv:ci | gzip > dist/docker/aussietv-linux-${{ matrix.arch }}.tar.gz
+          (cd dist/docker && sha256sum *.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AussieTV-Docker-${{ matrix.arch }}
+          path: dist/docker/*
+          if-no-files-found: error
+          retention-days: 90
+
+  publish-docker:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/experimental/linux-discord-builds') && github.repository == 'zidanerick/AussieTV'
+    needs: [core-tests, docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: AussieTV-Docker-*
+          path: dist/tested
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish the exact tested architecture images
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$(tr -d '\r\n' < RELEASE_VERSION)"
+          repo=ghcr.io/zidanerick/aussietv
+          for arch in amd64 arm64; do
+            dir="dist/tested/AussieTV-Docker-$arch"
+            (cd "$dir" && sha256sum -c SHA256SUMS)
+            docker load -i "$dir/aussietv-linux-$arch.tar.gz"
+            test "$(docker image inspect -f '{{.Architecture}}' aussietv:ci)" = "$arch"
+            docker tag aussietv:ci "$repo:sha-$GITHUB_SHA-$arch"
+            docker push "$repo:sha-$GITHUB_SHA-$arch"
+            docker image rm aussietv:ci
+          done
+          # Development publishes only docker-preview. Main keeps its existing tag.
+          if [ "$GITHUB_REF" = refs/heads/main ]; then
+            channel="experimental-$tag"
+          else
+            channel="docker-preview"
+          fi
+          docker buildx imagetools create \
+            -t "$repo:sha-$GITHUB_SHA" \
+            -t "$repo:$channel" \
+            "$repo:sha-$GITHUB_SHA-amd64" "$repo:sha-$GITHUB_SHA-arm64"
+          docker buildx imagetools inspect "$repo:sha-$GITHUB_SHA"

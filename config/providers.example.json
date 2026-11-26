@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "community",
+      "name": "Community TV",
+      "enabled": false,
+      "m3u": "community.m3u",
+      "xmltv": "community.xml",
+      "numberStart": 1000
+    },
+    {
+      "id": "international",
+      "name": "International",
+      "enabled": false,
+      "m3u": "international.m3u",
+      "numberStart": 2000
+    },
+    {
+      "id": "fast",
+      "name": "FAST",
+      "enabled": false,
+      "m3u": "fast.m3u",
+      "numberStart": 3000
+    }
+  ]
+}

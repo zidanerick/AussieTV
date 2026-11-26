@@ -1,22 +1,36 @@
 services:
   aussietv:
-    build: .
+    image: ${AUSSIETV_IMAGE:-ghcr.io/zidanerick/aussietv:experimental-v0.1.0-beta.1}
     restart: unless-stopped
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     ports:
-      - "45782:45782"
+      - "${AUSSIETV_FEED_HOST_BIND:-127.0.0.1}:45782:45782"
     environment:
+      AUSSIETV_EXTRA_AU_CHANNELS: ${AUSSIETV_EXTRA_AU_CHANNELS:-0}
+      AUSSIETV_PROVIDERS_FILE: ${AUSSIETV_PROVIDERS_FILE:-}
+      AUSSIETV_TELETEXT_CONFIG: ${AUSSIETV_TELETEXT_CONFIG:-}
       AUSSIETV_MODE: server
+      AUSSIETV_WEB_BIND: ""
       AUSSIETV_JELLYFIN_BIND: 0.0.0.0:45782
       AUSSIETV_JELLYFIN_BASE_URL: ${AUSSIETV_JELLYFIN_BASE_URL:?Provide your server LAN base URL in .env}
       AUSSIETV_JELLYFIN_KEY: ${AUSSIETV_JELLYFIN_KEY:?Set a long random key in .env}
       AUSSIETV_JELLYFIN_REGION: ${AUSSIETV_JELLYFIN_REGION:-Melbourne}
       AUSSIETV_JELLYFIN_STREAM_MODE: ${AUSSIETV_JELLYFIN_STREAM_MODE:-redirect}
+      AUSSIETV_JELLYFIN_ARTWORK_SYNC: ${AUSSIETV_JELLYFIN_ARTWORK_SYNC:-0}
+      AUSSIETV_JELLYFIN_SERVER_URL: ${AUSSIETV_JELLYFIN_SERVER_URL:-}
+      AUSSIETV_JELLYFIN_API_KEY: ${AUSSIETV_JELLYFIN_API_KEY:-}
       AUSSIETV_TELETEXT_VIDEO: ${AUSSIETV_TELETEXT_VIDEO:-0}
     volumes:
       - aussietv-cache:/data
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
 volumes:

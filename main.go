@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -26,6 +27,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -54,6 +56,7 @@ type Channel struct {
 	Name     string            `json:"name"`
 	Number   string            `json:"number"`
 	Network  string            `json:"network"`
+	Category string            `json:"category,omitempty"`
 	Logo     string            `json:"logo,omitempty"`
 	Stream   string            `json:"stream,omitempty"`
 	Headers  map[string]string `json:"headers,omitempty"`
@@ -75,6 +78,51 @@ var curated = []struct{ net, name, number string }{
 	{"Nine", "Channel 9", "9"}, {"Nine", "9Gem", "92"}, {"Nine", "9Go!", "93"}, {"Nine", "9Life", "94"},
 	{"Ten", "10", "10"}, {"Ten", "10 Drama", "12"}, {"Ten", "10 Comedy", "11"}, {"Ten", "Nickelodeon", "13"},
 }
+// Selected candidates are opt-in, use the existing index and never bypass DRM.
+var extraAustralian = []struct{ net, name, number string }{
+	{"Nine", "9Rush", "95"},
+	{"Community", "Channel 31", "44"},
+	{"Seven", "7NEWS Spotlight", "1209"},
+	{"ABC", "ABC News in 90 Seconds", "1210"},
+	{"", "Al Jazeera", "1202"},
+	{"", "BBC News", "1200"},
+	{"", "Bloomberg TV", "1207"},
+	{"", "DW English", "1203"},
+	{"SBS", "euronews", "1206"},
+	{"SBS", "France 24", "1204"},
+	{"Sky", "Sky News Now", "1201"},
+	{"Seven", "Air Crash Investigations", "1101"},
+	{"Seven", "Mythbusters", "1100"},
+	{"Nine", "Taronga 24/7", "1410"},
+	{"Seven", "A Country Practice", "1600"},
+	{"Seven", "All Saints", "1601"},
+	{"Seven", "Blue Heelers", "1602"},
+	{"Seven", "Home and Away Classics", "1603"},
+	{"Ten", "Adult Animation", "1502"},
+	{"Nine", "BBC Comedy", "1500"},
+	{"Nine", "9Crime", "1503"},
+	{"Nine", "9Mystery&Paranormal", "1504"},
+	{"Ten", "Rush", "1604"},
+	{"Seven", "All-Star Cinema", "1507"},
+	{"Ten", "Christmas Movies", "1700"},
+	{"Ten", "Moviesphere", "1508"},
+	{"Ten", "NickToons 90s", "1710"},
+	{"Nine", "BBC Antiques Roadshow", "1720"},
+	{"Nine", "BBC Food", "1509"},
+	{"Nine", "BBC Home & Garden", "1510"},
+	{"Seven", "Better Homes And Gardens", "1721"},
+	{"Seven", "Bondi Vet", "1722"},
+	{"Ten", "Big Brother Live Stream", "1730"},
+	{"Ten", "10 Sport 2", "1301"},
+	{"Seven", "7AFL", "1300"},
+	{"Seven", "Hockey One", "1306"},
+	{"", "Redbull TV", "1304"},
+}
+var extraAustralianEnabled bool
+func activeCurated() []struct{net,name,number string} {
+	if !extraAustralianEnabled {return curated}
+	return append(append([]struct{net,name,number string}{},curated...),extraAustralian...)
+}
 var regionAllowed = map[string]bool{"Melbourne": true, "Sydney": true, "Brisbane": true, "Adelaide": true, "Perth": true, "Hobart": true, "Canberra": true, "Darwin": true}
 var official = map[string]string{
 	"ABC":   "https://iview.abc.net.au/collection/959",
@@ -82,6 +130,7 @@ var official = map[string]string{
 	"Seven": "https://7plus.com.au/live-tv",
 	"Nine":  "https://www.9now.com.au/live/channel-9",
 	"Ten":   "https://10.com.au/live",
+	"Community": "https://www.c31.org.au/",
 }
 var client = &http.Client{Timeout: 24 * time.Second, Transport: &http.Transport{
 	Proxy: http.ProxyFromEnvironment, MaxIdleConns: 50, MaxIdleConnsPerHost: 12, IdleConnTimeout: 65 * time.Second,
@@ -113,7 +162,7 @@ func safeDial(ctx context.Context, network, address string) (net.Conn, error) {
 	var dialer net.Dialer
 	for _, target := range ips {
 		ip := target.IP
-		if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+		if !publicMediaIP(ip) {
 			continue
 		}
 		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
@@ -182,6 +231,7 @@ var uriRegexp = regexp.MustCompile(`URI="([^"]+)"`)
 // An approximate/ambiguous result is intentionally treated as no artwork.
 type Artwork struct {
 	Poster string `json:"poster,omitempty"`
+	Backdrop string `json:"backdrop,omitempty"`
 	Credit string `json:"credit,omitempty"`
 	Page   string `json:"page,omitempty"`
 }
@@ -232,7 +282,7 @@ func lookupArtwork(title string) Artwork {
 		return empty
 	}
 	req.Header.Set("User-Agent", "AussieTV/0.1.0-beta.1 (TVmaze artwork attribution)")
-	response, err := artworkClient.Do(req)
+	response, err := pacedArtworkRequest(req)
 	if err != nil {
 		log.Printf("programme art lookup: %v", err)
 		return empty
@@ -243,6 +293,7 @@ func lookupArtwork(title string) Artwork {
 	}
 	var candidates []struct {
 		Show struct {
+			ID int `json:"id"`
 			Name  string `json:"name"`
 			URL   string `json:"url"`
 			Image struct {
@@ -255,6 +306,7 @@ func lookupArtwork(title string) Artwork {
 		return empty
 	}
 	var match *Artwork
+	var showID int
 	for _, candidate := range candidates {
 		show := candidate.Show
 		if canonicalTitle(show.Name) != canonicalTitle(title) {
@@ -276,9 +328,13 @@ func lookupArtwork(title string) Artwork {
 			}
 		}
 		match = &art
+		showID = show.ID
 	}
 	if match == nil {
 		return empty
+	}
+	if showID > 0 && match.Poster != "" {
+		match.Backdrop = lookupArtworkBackdrop(showID)
 	}
 	return *match
 }
@@ -322,8 +378,7 @@ func cachedProgrammeArtwork(title string) (string, bool) {
 
 func scheduleProgrammeArtwork(channels []Channel) {
 	seen := make(map[string]bool)
-	for _, ch := range channels {
-		for _, programme := range ch.Programs {
+	for _, programme := range prioritizedArtworkProgrammes(channels) {
 			clean := artworkTitle(programme.Title)
 			if clean == "" {
 				continue
@@ -348,21 +403,16 @@ func scheduleProgrammeArtwork(channels []Channel) {
 				delete(artworkBackground.pending, key)
 			}
 			artworkBackground.Unlock()
-		}
 	}
 	artworkBackground.once.Do(func() {
-		throttle := time.NewTicker(700 * time.Millisecond)
-		for i := 0; i < 2; i++ {
+				for i := 0; i < 2; i++ {
 			go func() {
 				for title := range artworkBackground.queue {
-					<-throttle.C
 					key := canonicalTitle(title)
 					// A concurrent browser lookup might have populated it.
 					if _, exists := cachedProgrammeArtwork(title); !exists {
 						result := lookupArtwork(title)
-						artMu.Lock()
-						artCache[key] = artworkCacheEntry{Art: result, At: time.Now()}
-						artMu.Unlock()
+						storeArtworkCacheEntry(key, result)
 					}
 					artworkBackground.Lock()
 					delete(artworkBackground.pending, key)
@@ -407,9 +457,7 @@ func artworkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := lookupArtwork(title)
-	artMu.Lock()
-	artCache[key] = artworkCacheEntry{Art: result, At: time.Now()}
-	artMu.Unlock()
+	storeArtworkCacheEntry(key, result)
 	jsonResponse(w, result)
 }
 
@@ -420,6 +468,9 @@ func safeRegion(v string) string {
 	return "Melbourne"
 }
 func loadChannels(region string) ChannelData {
+	return appendProviderChannels(loadAustralianChannels(region))
+}
+func loadAustralianChannels(region string) ChannelData {
 	region = safeRegion(region)
 	cacheMu.Lock()
 	old, ok := cache[region]
@@ -473,6 +524,22 @@ func fetchChannels(region string, old cacheEntry, hasOld bool) ChannelData {
 		return old.data
 	}
 	if offline, loaderr := loadOffline(region); loaderr == nil {
+		// Never resurrect unselected entries or disabled expansion from disk.
+		filtered:=make([]Channel,0,len(offline.Channels))
+		for _,ch:=range offline.Channels {
+			for _,spec:=range activeCurated() {
+				if ch.Name==spec.name && ch.Number==spec.number && (ch.Network==spec.net || (spec.net=="" && ch.Network=="International")) {
+					if category:=expandedCategory(ch);category!="" {
+						if !providerURL(ch.Stream,true) {break}
+						ch.Category=category
+						ch.Headers=nil
+						if ch.Network=="" {ch.Network="International"}
+					}
+					filtered=append(filtered,ch);break
+				}
+			}
+		}
+		offline.Channels=filtered
 		offline.Warning = "Guide offline; displaying last saved channel data."
 		return offline
 	}
@@ -523,20 +590,26 @@ func setProviderRequestHeaders(req *http.Request, ch Channel) {
 
 func makeData(entries map[string]Entry, region string) ChannelData {
 	result := ChannelData{Region: region, Updated: time.Now().Format(time.RFC3339), Source: sourceBase + region + "/tv.json", Channels: []Channel{}}
-	for _, spec := range curated {
+	for _, spec := range activeCurated() {
 		var id string
 		var entry Entry
 		for k, e := range entries {
 			if e.Network == spec.net && e.Name == spec.name {
-				id = k
-				entry = e
-				break
+				// Exact match only; use stable ordering if the index contains duplicates.
+				if id == "" || k < id { id = k; entry = e }
 			}
 		}
 		if id == "" {
 			continue
 		}
 		ch := Channel{ID: id, Name: entry.Name, Number: spec.number, Network: entry.Network, Logo: entry.Logo, Stream: entry.Master, Headers: providerHeaders(entry.Headers), Official: official[spec.net], Programs: []Program{}}
+		if category := expandedCategory(ch); category != "" {
+			// No provider-supplied device impersonation headers or credentials.
+			if !providerURL(ch.Stream,true) {continue}
+			ch.Headers=nil
+			ch.Category=category
+			if ch.Network=="" {ch.Network="International"}
+		}
 		var points []Program
 		for _, p := range entry.Programs {
 			if len(p) < 2 {
@@ -608,14 +681,14 @@ func playlistURL(chID, remote string) string {
 }
 func validateRemote(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil {
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil || u.Opaque != "" || u.Fragment != "" || (u.Port() != "" && u.Port() != "80" && u.Port() != "443") {
 		return nil, errors.New("invalid stream address")
 	}
 	h := strings.ToLower(u.Hostname())
-	if h == "localhost" || strings.HasSuffix(h, ".localhost") || strings.HasSuffix(h, ".local") {
+	if localMediaHost(h) {
 		return nil, errors.New("blocked local address")
 	}
-	if ip := net.ParseIP(h); ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() || ip.IsMulticast()) {
+	if ip := net.ParseIP(h); ip != nil && !publicMediaIP(ip) {
 		return nil, errors.New("blocked private address")
 	}
 	return u, nil
@@ -645,6 +718,9 @@ func hlsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	cacheMu.Unlock()
 	if found == nil {
+		if ch,ok:=externalProviderChannel(id);ok{found=&ch}
+	}
+	if found == nil {
 		http.Error(w, "Refresh channel listings and try again", 404)
 		return
 	}
@@ -668,7 +744,7 @@ func hlsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := mediaClient.Do(req)
 	if err != nil {
-		log.Printf("stream error %s: %v", id, err)
+		log.Print("stream request failed (network or provider restriction)")
 		http.Error(w, "Stream unavailable (network or provider restriction)", 502)
 		return
 	}
@@ -693,9 +769,13 @@ func hlsHandler(w http.ResponseWriter, r *http.Request) {
 		lines := strings.Split(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n")
 		for i, line := range lines {
 			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "#EXT-X-KEY") && (strings.Contains(line, "KEYFORMAT=") || strings.Contains(line, "METHOD=SAMPLE-AES")) {
-				http.Error(w, "This channel requires a protected player; use the official site", 415)
-				return
+			if strings.HasPrefix(line, "#EXT-X-KEY") || strings.HasPrefix(line, "#EXT-X-SESSION-KEY") {
+				if err := validateHLSKeyTag(line, finalURL); err != nil {
+					reason:=hlsFailureReason(err)
+					recordTuneDetail(id,"web-manifest",415,0,0,resp.StatusCode,reason)
+					http.Error(w, "Unsupported HLS key format or encryption; use the official player", 415)
+					return
+				}
 			}
 			if line != "" && !strings.HasPrefix(line, "#") {
 				target, er := finalURL.Parse(line)
@@ -769,6 +849,11 @@ func openBrowser(addr string) error {
 }
 
 func prepareLogging() {
+	if os.Getenv("AUSSIETV_MODE") == "server" {
+		log.SetOutput(os.Stdout)
+		log.SetFlags(log.LstdFlags | log.Lshortfile)
+		return
+	}
 	path := ""
 	if base, err := os.UserCacheDir(); err == nil {
 		path = filepath.Join(base, "AussieTV", "startup.log")
@@ -887,154 +972,79 @@ func initTeletext() error {
 }
 
 func main() {
-	if code, handled := maybeRunFirewallHelper(os.Args); handled {
-		os.Exit(code)
+	if len(os.Args)==2 && os.Args[1]=="--healthcheck" {
+		if err:=serverHealthcheck();err!=nil {fmt.Fprintln(os.Stderr,err);os.Exit(1)}
+		return
 	}
-	prepareLogging()
-	if err := initTeletext(); err != nil {
-		log.Printf("Teletext unavailable: %v", err)
+	// Docker is the supported runtime. No desktop tray, browser launch,
+	// firewall helper, settings writer or unauthenticated fallback listener.
+	log.SetOutput(os.Stdout)
+	log.SetFlags(log.LstdFlags|log.Lshortfile)
+	if os.Getenv("AUSSIETV_MODE")!="server" {
+		log.Fatal("AussieTV requires the Docker server configuration; see docs/DOCKER.md")
 	}
+	webCfg,err:=dockerWebConfigFromEnv(true)
+	if err!=nil {log.Fatal(err)}
+	feedCfg,feedEnabled,err:=jellyfinConfigFromEnv()
+	if err!=nil {log.Fatal(err)}
+	if webCfg==nil && !feedEnabled {log.Fatal("Configure at least one authenticated listener")}
+	ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM)
+	defer stop()
 
-	serverMode := os.Getenv("AUSSIETV_MODE") == "server"
-	feedCfg, envEnabled, feedErr := jellyfinConfigFromEnv()
-	if feedErr != nil {
-		startupFailure(feedErr)
+	initArtworkDiskCache()
+	extraAustralianEnabled=os.Getenv("AUSSIETV_EXTRA_AU_CHANNELS")=="1"
+	if providers,err:=loadProviderSet(os.Getenv("AUSSIETV_PROVIDERS_FILE"));err!=nil {
+		log.Printf("Additional providers disabled: %v",err)
+	} else {
+		installedProviders=providers
+		if len(providers.Channels)>0 {log.Printf("Loaded %d additional channels",len(providers.Channels))}
 	}
-	if serverMode && !envEnabled {
-		startupFailure(errors.New("server mode requires configured Jellyfin feed credentials"))
-	}
-	supervisor := &feedSupervisor{}
+	if err:=initTeletext();err!=nil {log.Printf("Teletext unavailable: %v",err)}
+	supervisor:=&feedSupervisor{}
 	defer supervisor.Close()
-	var settings *settingsController
-	if !serverMode {
-		var err error
-		settings, err = newSettingsController(supervisor, envEnabled)
-		if err != nil {
-			// Never hide the entire TV app because an older/corrupted settings file
-			// cannot be loaded. Keep the original file for diagnostics.
-			log.Printf("Cannot load saved settings: %v", err)
-			settings, err = newDefaultSettingsController(supervisor, envEnabled)
-			if err != nil {
-				startupFailure(fmt.Errorf("create default settings: %w", err))
-			}
-		}
+	if feedEnabled {
+		if err:=supervisor.Replace(feedCfg,true);err!=nil {log.Fatalf("Jellyfin listener: %v",err)}
+		go warmProgrammeArtwork(ctx,feedCfg.Region)
+		if syncCfg,err:=artworkSyncFromEnv(feedCfg);err!=nil{
+			log.Printf("Jellyfin artwork sync disabled: %v",err)
+			artworkSyncStatus.Lock()
+			artworkSyncStatus.report.Status=err.Error()
+			artworkSyncStatus.Unlock()
+		} else if syncCfg!=nil {go syncCfg.run(ctx)}
 	}
-	if envEnabled {
-		if settings != nil {
-			settings.config = desktopSettings{Enabled: true, LAN: strings.HasPrefix(feedCfg.Bind, "0.0.0.0:"), Discovery: feedCfg.Discovery, StreamMode: feedCfg.StreamMode, BaseURL: feedCfg.BaseURL, Region: feedCfg.Region, Key: feedCfg.Key}
-		}
-		if err := supervisor.Replace(feedCfg, true); err != nil {
-			if serverMode {
-				startupFailure(fmt.Errorf("Jellyfin feed listener: %w", err))
-			}
-			log.Printf("Jellyfin feed unavailable (TV interface still starts): %v", err)
-		}
-	} else if settings != nil {
-		cfg, enabled := desktopToJellyfin(settings.config)
-		if err := supervisor.Replace(cfg, enabled); err != nil {
-			// This is an optional network integration, never a fatal TV startup error.
-			log.Printf("Jellyfin feed unavailable (TV interface still starts): %v", err)
-		}
+	go runPublicBroadcasterChecks(ctx)
+	log.Printf("AussieTV v%s server starting on %s/%s",version,runtime.GOOS,runtime.GOARCH)
+
+	if webCfg==nil {
+		log.Print("Jellyfin-only mode; browser listener disabled")
+		<-ctx.Done()
+		log.Print("AussieTV stopped")
+		return
 	}
-	log.Printf("AussieTV v%s starting on %s/%s", version, runtime.GOOS, runtime.GOARCH)
-	mux := http.NewServeMux()
-	if teletextService != nil {
-		mux.Handle("GET /teletext/", teletextService.Handler())
-	}
-	mux.HandleFunc("GET /", serveAppAsset)
-	mux.HandleFunc("GET /api/artwork", artworkHandler)
-	mux.HandleFunc("GET /api/logo", logoHandler)
-	mux.HandleFunc("GET /api/channels", func(w http.ResponseWriter, r *http.Request) {
-		markPing()
-		jsonResponse(w, loadChannels(r.URL.Query().Get("region")))
+	mux:=http.NewServeMux()
+	if teletextService!=nil {mux.Handle("GET /teletext/",teletextService.Handler())}
+	mux.HandleFunc("GET /",serveAppAsset)
+	mux.HandleFunc("GET /api/artwork",artworkHandler)
+	mux.HandleFunc("GET /api/logo",logoHandler)
+	mux.HandleFunc("GET /api/channels",func(w http.ResponseWriter,r *http.Request){
+		jsonResponse(w,loadChannels(r.URL.Query().Get("region")))
 	})
-	mux.HandleFunc("POST /api/heartbeat", func(w http.ResponseWriter, r *http.Request) { markPing(); w.WriteHeader(204) })
-	mux.HandleFunc("GET /hls", hlsHandler)
-	if settings != nil {
-		mux.HandleFunc("GET /api/settings", settings.handler)
-		mux.HandleFunc("POST /api/settings", settings.handler)
-	}
-	mux.HandleFunc("GET /channel.m3u", func(w http.ResponseWriter, r *http.Request) {
-		id := r.URL.Query().Get("ch")
-		d := loadChannels(r.URL.Query().Get("region"))
-		for _, ch := range d.Channels {
-			if ch.ID == id && ch.Stream != "" {
-				w.Header().Set("Content-Type", "application/x-mpegurl")
-				w.Header().Set("Content-Disposition", "attachment; filename=\"AussieTV-"+strings.ReplaceAll(ch.Name, " ", "-")+".m3u\"")
-				fmt.Fprintf(w, "#EXTM3U\n#EXTINF:-1,%s\n%s\n", ch.Name, ch.Stream)
-				return
-			}
-		}
-		http.NotFound(w, r)
-	})
-	mux.HandleFunc("POST /api/quit", func(w http.ResponseWriter, r *http.Request) {
-		// Browser windows never own the lifetime of a tray application.
-		if serverMode || trayReady.Load() {
-			http.Error(w, "Use the tray menu to exit", http.StatusForbidden)
-			return
-		}
-		w.WriteHeader(204)
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			defer cancel()
-			_ = server.Shutdown(ctx)
-		}()
-	})
-	listener, err := net.Listen("tcp", "127.0.0.1:45781")
-	if err != nil {
-		log.Printf("Port 45781 unavailable (%v); trying a free port", err)
-		listener, err = net.Listen("tcp", "127.0.0.1:0")
-	}
-	if err != nil {
-		startupFailure(err)
-	}
-	server = &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		host := r.Host
-		if h, _, err := net.SplitHostPort(host); err == nil {
-			host = h
-		}
-		if host != "127.0.0.1" && host != "localhost" {
-			http.Error(w, "Invalid local host", 403)
-			return
-		}
-		if origin := r.Header.Get("Origin"); origin != "" {
-			u, err := url.Parse(origin)
-			if err != nil || u.Host != r.Host || u.Scheme != "http" {
-				http.Error(w, "Invalid origin", 403)
-				return
-			}
-		}
-		mux.ServeHTTP(w, r)
-	}), ReadHeaderTimeout: 10 * time.Second}
-	addr := "http://" + listener.Addr().String()
-	log.Printf("AussieTV listening at %s", addr)
-	if !serverMode {
-		if runtime.GOOS == "windows" && os.Getenv("AUSSIETV_NO_TRAY") != "1" {
-			logFile := filepath.Join(os.Getenv("LOCALAPPDATA"), "AussieTV", "startup.log")
-			stop := func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				defer cancel()
-				_ = server.Shutdown(ctx)
-			}
-			if err := startTray(addr, addr+"/settings", logFile, stop); err != nil {
-				log.Printf("Tray registration failed; continuing in browser mode: %v", err)
-				go heartbeatWatch()
-			} else {
-				trayReady.Store(true)
-			}
-		} else {
-			go heartbeatWatch()
-		}
-		go func() {
-			time.Sleep(200 * time.Millisecond)
-			if err := openBrowser(addr); err != nil {
-				log.Printf("Could not open browser: %v", err)
-			}
-		}()
-	}
-	err = server.Serve(listener)
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		startupFailure(fmt.Errorf("server stopped: %w", err))
-	}
-	log.Println("AussieTV stopped")
+	mux.HandleFunc("GET /hls",hlsHandler)
+	listener,err:=net.Listen("tcp",webCfg.bind)
+	if err!=nil {log.Fatalf("Browser listener: %v",err)}
+	server=&http.Server{Handler:webCfg.handler(mux),ReadHeaderTimeout:10*time.Second,IdleTimeout:60*time.Second,MaxHeaderBytes:1<<16}
+	log.Printf("AussieTV browser listening at %s",listener.Addr())
+	done:=make(chan struct{})
+	go func(){
+		defer close(done)
+		<-ctx.Done()
+		shutdownCtx,cancel:=context.WithTimeout(context.Background(),5*time.Second)
+		defer cancel()
+		if err:=server.Shutdown(shutdownCtx);err!=nil {_=server.Close()}
+	}()
+	err=server.Serve(listener)
+	if err!=nil && !errors.Is(err,http.ErrServerClosed){log.Printf("Browser server failed: %v",err);stop();<-done;os.Exit(1)}
+	stop()
+	<-done
+	log.Print("AussieTV stopped")
 }

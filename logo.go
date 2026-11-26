@@ -39,8 +39,10 @@ var logoCache = struct {
 // Only channels selected by the curated TV lineup may be proxied. The
 // caller supplies a channel ID, never a URL, so this is not an open proxy.
 func logoChannelAllowed(c Channel) bool {
-	for _, spec := range curated {
-		if c.Network == spec.net && c.Name == spec.name && c.Number == spec.number {
+	if ch,ok:=externalProviderChannel(c.ID);ok{return ch.Logo==c.Logo && ch.Name==c.Name && ch.Number==c.Number}
+
+	for _, spec := range activeCurated() {
+		if (c.Network == spec.net || (spec.net=="" && c.Network=="International")) && c.Name == spec.name && c.Number == spec.number {
 			return true
 		}
 	}

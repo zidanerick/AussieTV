@@ -1,21 +1,27 @@
-# Read-only, opt-in Jellyfin feed container. The interactive TV UI remains
-# localhost-only until a separately authenticated LAN interface is developed.
-FROM golang:1.23-alpine AS build
+# AussieTV Docker server for linux/amd64 and linux/arm64. Explicit authenticated listeners.
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.24 AS build
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /src
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o /out/aussietv .
+RUN go run ./tools/iconbuilder && \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w" -o /out/aussietv .
 
-FROM alpine:3.21
+FROM alpine:3.24.4
 RUN apk add --no-cache ca-certificates ffmpeg font-dejavu && \
     addgroup -S -g 10001 aussietv && \
     adduser -S -D -u 10001 -G aussietv aussietv && \
     mkdir -p /data && chown -R aussietv:aussietv /data
 COPY --from=build /out/aussietv /usr/local/bin/aussietv
-USER aussietv
+COPY LICENSE /usr/share/doc/aussietv/LICENSE
+LABEL org.opencontainers.image.source="https://github.com/zidanerick/AussieTV"
+USER 10001:10001
 ENV XDG_CACHE_HOME=/data \
     AUSSIETV_MODE=server \
-    AUSSIETV_JELLYFIN_BIND=0.0.0.0:45782 \
+    AUSSIETV_JELLYFIN_BIND= \
     AUSSIETV_JELLYFIN_REGION=Melbourne
 WORKDIR /data
-EXPOSE 45782
+EXPOSE 45781 45782
+STOPSIGNAL SIGTERM
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 CMD ["/usr/local/bin/aussietv", "--healthcheck"]
 ENTRYPOINT ["/usr/local/bin/aussietv"]

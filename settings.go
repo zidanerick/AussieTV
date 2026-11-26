@@ -111,7 +111,7 @@ func readSettings() (desktopSettings, error) {
 }
 func validateSettings(cfg desktopSettings) error {
 	if !validStreamMode(cfg.StreamMode) {
-		return errors.New("Jellyfin stream mode must be redirect, relay, or mpegts")
+		return errors.New("Jellyfin stream mode must be redirect, relay, mpegts, or fast-tune")
 	}
 	if !regionAllowed[cfg.Region] {
 		return errors.New("select a supported Australian TV region")
@@ -198,6 +198,7 @@ func desktopToJellyfin(cfg desktopSettings) (jellyfinConfig, bool) {
 // listener. Settings changes replace only the feed listener, never the desktop
 // server or its private /api/quit handler.
 type feedSupervisor struct {
+	fastTune *fastTunePool
 	mu            sync.Mutex
 	server        *http.Server
 	listener      net.Listener
@@ -211,6 +212,7 @@ type feedSupervisor struct {
 }
 
 func (s *feedSupervisor) stopLocked() {
+	if s.fastTune != nil { s.fastTune.close(); s.fastTune=nil }
 	if s.server != nil {
 		s.server.Close()
 	}
@@ -285,7 +287,10 @@ func (s *feedSupervisor) startLocked(cfg jellyfinConfig, enabled bool) error {
 	}
 	discoveryUDPListening.Store(discoverConn != nil)
 	discoveryHTTPListening.Store(hdhrListener != nil)
-	srv := &http.Server{Handler: newJellyfinHandler(cfg, loadChannels), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, WriteTimeout: 45 * time.Second, MaxHeaderBytes: 1 << 16}
+	if cfg.StreamMode == "fast-tune" {
+		s.fastTune = newFastTunePool(func(w http.ResponseWriter,r *http.Request,ch Channel){ serveJellyfinMPEGTS(w,r,cfg,ch) })
+	}
+	srv := &http.Server{Handler: newJellyfinHandlerWithPool(cfg, loadChannels,s.fastTune), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, WriteTimeout: 45 * time.Second, MaxHeaderBytes: 1 << 16}
 	s.listener = ln
 	s.server = srv
 	s.discoveryConn = discoverConn
@@ -387,7 +392,7 @@ func newSettingsController(feed *feedSupervisor, managed bool) (*settingsControl
 func (c *settingsController) present() publicSettings {
 	cfg := c.config
 	p := publicSettings{Enabled: cfg.Enabled, LAN: cfg.LAN, Discovery: cfg.Discovery, StreamMode: effectiveStreamMode(cfg.StreamMode), BaseURL: cfg.BaseURL, Region: cfg.Region, Managed: c.managed, CSRF: c.csrf, Status: c.feed.Status(), FirewallMessage: c.firewallMessage}
-	if effectiveStreamMode(cfg.StreamMode) == "mpegts" {
+	if usesMPEGTS(cfg.StreamMode) {
 		available, runnable, source := ffmpegHealth()
 		switch {
 		case !available:

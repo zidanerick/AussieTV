@@ -143,6 +143,7 @@ func mpegTSFFmpegArgs(source string) []string {
 	// Preserve source codecs and audio timestamps without re-encoding.
 	return []string{
 		"-hide_banner", "-loglevel", "error", "-nostdin",
+		"-protocol_whitelist", "http,https,tcp,tls,crypto",
 		"-rw_timeout", "12000000", "-analyzeduration", "3000000", "-probesize", "2097152",
 		"-i", source,
 		"-map", "0:v:0", "-map", "0:a:0", "-c:v", "copy", "-c:a", "copy",
@@ -164,7 +165,12 @@ func serveJellyfinMPEGTS(w http.ResponseWriter, r *http.Request, cfg jellyfinCon
 	input := base + "/jellyfin/hls/" + id + ".m3u8?key=" + url.QueryEscape(cfg.Key)
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	command := exec.CommandContext(ctx, ffmpeg, mpegTSFFmpegArgs(input)...)
+	args := mpegTSFFmpegArgs(input)
+	if cfg.StreamMode == "fast-tune" {
+		// Request initial PAT/PMT headers; FFmpeg repeats PSI during normal TS muxing.
+		args = append(args[:len(args)-3], append([]string{"-mpegts_flags","+resend_headers"},args[len(args)-3:]...)...)
+	}
+	command := exec.CommandContext(ctx, ffmpeg, args...)
 	ffmpegexec.Configure(command)
 	stdout, err := command.StdoutPipe()
 	if err != nil {
@@ -210,6 +216,7 @@ func serveJellyfinMPEGTS(w http.ResponseWriter, r *http.Request, cfg jellyfinCon
 		initial.Write(packet)
 		inspected.add(packet)
 		if audioTimer == nil {
+			if cfg.StreamMode == "fast-tune" { recordTune(ch.ID,"fast-tune-first-packet",200,time.Since(start),0) }
 			audioTimer = time.AfterFunc(5*time.Second, func() { audioExpired.Store(true); cancel() })
 		}
 		if inspected.audioReady() {
