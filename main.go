@@ -769,9 +769,13 @@ func hlsHandler(w http.ResponseWriter, r *http.Request) {
 		lines := strings.Split(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n")
 		for i, line := range lines {
 			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "#EXT-X-KEY") && (strings.Contains(line, "KEYFORMAT=") || strings.Contains(line, "METHOD=SAMPLE-AES")) {
-				http.Error(w, "This channel requires a protected player; use the official site", 415)
-				return
+			if strings.HasPrefix(line, "#EXT-X-KEY") || strings.HasPrefix(line, "#EXT-X-SESSION-KEY") {
+				if err := validateHLSKeyTag(line, finalURL); err != nil {
+					reason:=hlsFailureReason(err)
+					recordTuneDetail(id,"web-manifest",415,0,0,resp.StatusCode,reason)
+					http.Error(w, "Unsupported HLS key format or encryption; use the official player", 415)
+					return
+				}
 			}
 			if line != "" && !strings.HasPrefix(line, "#") {
 				target, er := finalURL.Parse(line)

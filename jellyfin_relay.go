@@ -116,13 +116,15 @@ func relayURL(cfg jellyfinConfig, chID, remote string) string {
 
 var errInvalidHLS = errors.New("provider did not return a valid HLS playlist")
 var errIndirectHLS = errors.New("unsupported HLS indirect resource directive")
-var errProtectedHLS = errors.New("protected HLS playlist is not supported")
 
 func hlsFailureReason(err error) string {
 	switch {
 	case errors.Is(err,errInvalidHLS): return "invalid-hls-manifest"
 	case errors.Is(err,errIndirectHLS): return "unsupported-hls-directive"
-	case errors.Is(err,errProtectedHLS): return "protected-hls"
+	case errors.Is(err,errHLSKeyFormat): return "protected-hls-keyformat"
+	case errors.Is(err,errHLSKeyMethod): return "unsupported-hls-encryption-method"
+	case errors.Is(err,errHLSKeyVersion): return "unsupported-hls-key-version"
+	case errors.Is(err,errInvalidHLSKey): return "invalid-hls-key-tag"
 	default: return "invalid-or-blocked-hls-reference"
 	}
 }
@@ -149,9 +151,7 @@ func rewriteRelayPlaylist(body []byte, base *url.URL, cfg jellyfinConfig, chID s
 			continue
 		}
 		if strings.HasPrefix(item, "#EXT-X-KEY") || strings.HasPrefix(item, "#EXT-X-SESSION-KEY") {
-			if strings.Contains(item, "KEYFORMAT=") || strings.Contains(item, "METHOD=SAMPLE-AES") {
-				return nil, errProtectedHLS
-			}
+			if err:=validateHLSKeyTag(item,base);err!=nil{return nil,err}
 		}
 		if item == "" {
 			continue

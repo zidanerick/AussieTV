@@ -109,3 +109,15 @@ variable substitution and protected HLS remain unsupported. Authenticated
 Jellyfin diagnostics retain a separate bounded recentFailures history with
 upstreamStatus and reason where known. A provider HTTP 401/403 is not the
 same as an FFmpeg remux failure; no access restrictions are bypassed.
+
+### HLS encryption diagnostics
+
+Ordinary AES-128 HLS with the default or explicitly declared identity key
+format is supported without altering the encryption declaration. Non-identity
+key formats, unsupported encryption methods and malformed key declarations
+remain blocked in both browser and Jellyfin playback. The diagnostics report
+`protected-hls-keyformat`, `unsupported-hls-encryption-method`,
+`unsupported-hls-key-version` or `invalid-hls-key-tag` rather than confusing
+all key declarations with DRM. No DRM license handling or circumvention is
+implemented. A live 7AFL report showed a playlist rejection but did not
+identify its exact method or key format; live compatibility is unverified.

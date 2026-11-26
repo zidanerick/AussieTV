@@ -23,7 +23,7 @@ func TestExpandedHLSMetadataCompatibility(t *testing.T) {
 	} {
 		if _,err:=rewriteRelayPlaylist([]byte("#EXTM3U\n"+tag+"\n"),base,cfg,"test");hlsFailureReason(err)!="unsupported-hls-directive"{t.Fatalf("indirect request allowed: %v",err)}
 	}
-	if _,err:=rewriteRelayPlaylist([]byte("#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"key\"\n"),base,cfg,"test");hlsFailureReason(err)!="protected-hls"{t.Fatalf("protected manifest accepted: %v",err)}
+	if _,err:=rewriteRelayPlaylist([]byte("#EXTM3U\n#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"key\"\n"),base,cfg,"test");hlsFailureReason(err)!="unsupported-hls-encryption-method"{t.Fatalf("protected manifest accepted: %v",err)}
 }
 
 type compatibilityTransport func(*http.Request)(*http.Response,error)
