@@ -1,52 +1,51 @@
 package main
 
-// Round 2 approved shortlist. Existing Australian channel IDs and numbers
+// Explicit Keep selections from the completed 26 November channel workbook. Existing Australian channel IDs and numbers
 // are preserved. Expansion uses stable names and numbers, never fuzzy matches.
-var roundTwoCategories = map[string]string{
-	"95": "General & community",
-	"44": "General & community",
-	"1000": "General & community",
-	"1001": "General & community",
-	"1200": "News & business",
-	"1201": "News & business",
-	"1202": "News & business",
-	"1203": "News & business",
-	"1204": "News & business",
-	"1205": "News & business",
-	"1206": "News & business",
-	"1207": "News & business",
-	"1208": "News & business",
-	"1300": "Sports",
-	"1301": "Sports",
-	"1302": "Sports",
-	"1303": "Sports",
-	"1304": "Sports",
-	"1305": "Sports",
-	"1306": "Sports",
-	"1307": "Sports",
-	"1400": "Factual & documentaries",
-	"1401": "Factual & documentaries",
-	"1402": "Factual & documentaries",
-	"1403": "Factual & documentaries",
-	"1404": "Factual & documentaries",
-	"1500": "Multi-show entertainment",
-	"1501": "Multi-show entertainment",
-	"1502": "Multi-show entertainment",
-	"1503": "Multi-show entertainment",
-	"1504": "Multi-show entertainment",
-	"1505": "Multi-show entertainment",
-	"1506": "Multi-show entertainment",
-	"1507": "Multi-show entertainment",
-	"1508": "Multi-show entertainment",
-	"1509": "Multi-show entertainment",
-	"1510": "Multi-show entertainment",
-	"1511": "Multi-show entertainment",
+var selectedCategories = map[string]string{
+	"95": "General / FTA",
+	"44": "Community / Public",
+	"1209": "News / Business",
+	"1210": "News / Business",
+	"1202": "News / Business",
+	"1200": "News / Business",
+	"1207": "News / Business",
+	"1203": "News / Business",
+	"1206": "News / Business",
+	"1204": "News / Business",
+	"1201": "News / Business",
+	"1101": "Science / Tech / Nature",
+	"1100": "Science / Tech / Nature",
+	"1410": "Science / Tech / Nature",
+	"1600": "Drama / Series",
+	"1601": "Drama / Series",
+	"1602": "Drama / Series",
+	"1603": "Drama / Series",
+	"1502": "Comedy",
+	"1500": "Comedy",
+	"1503": "Crime / Mystery",
+	"1504": "Crime / Mystery",
+	"1604": "Crime / Mystery",
+	"1507": "Movies",
+	"1700": "Movies",
+	"1508": "Movies",
+	"1710": "Kids / Family",
+	"1720": "Food / Lifestyle",
+	"1509": "Food / Lifestyle",
+	"1510": "Food / Lifestyle",
+	"1721": "Food / Lifestyle",
+	"1722": "Food / Lifestyle",
+	"1730": "Reality / Entertainment",
+	"1301": "Sport",
+	"1300": "Sport",
+	"1306": "Sport",
+	"1304": "Sport",
 }
 
 func expandedCategory(ch Channel) string {
 	for _, spec:=range extraAustralian {
 		if ch.Name==spec.name && ch.Number==spec.number && (ch.Network==spec.net || (spec.net=="" && ch.Network=="International")) {
-			return roundTwoCategories[spec.number]
+			return selectedCategories[spec.number]
 		}
 	}
 	return ""

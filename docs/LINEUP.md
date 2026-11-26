@@ -1,124 +1,102 @@
-# Round 2 channel shortlist
+# Selected channel lineup
 
-Approved selection workbook: AussieTV_Channel_Selection_Round_2.xlsx (110
-entries, all cells Undecided; user approved the shortlist as a whole).
-No existing channels are removed. No radio, audio-only, ambient or
-single-show feeds from the old experimental expansion are included.
+Source: completed user channel selection workbook (84 Keep, 445 Undecided).
+Only explicit Keep rows are included in the built-in lineup. This supersedes
+the previous 110-entry Round 2 shortlist. All 22 existing channels remain
+selected, plus optional AussieTV Text (995). Previously unselected indexed
+expansion entries are removed, including from offline guide fallback.
+Selected single-show and seasonal streams are intentional exceptions to the
+earlier general-channel preference. No audio-only entries are selected.
 
-## Enable
+Enable using AUSSIETV_EXTRA_AU_CHANNELS=1 and refresh Jellyfin guide data.
+Set 0 to retain only the original lineup. Existing source channel IDs,
+numbers for retained channels, feed URLs and Fast Tune remain unchanged.
+Custom administrator-configured providers are separate and unaffected.
 
-Set AUSSIETV_EXTRA_AU_CHANNELS=1 and restart, then refresh Jellyfin Live TV
-guide data. Existing channel IDs, numbers and feed URLs are unchanged.
-The source is https://i.mjh.nz/au/Melbourne/list.html and its regional JSON
-counterpart. Availability varies by region. Matching uses exact indexed name
-and network and a valid public HTTPS HLS URL. No playback or rights testing
-has been completed for all candidates. No inferred or fabricated schedules.
-Source entries without listings can have an empty guide. Sports event
-channels may not be continuously available. Set the variable to 0 to revert.
+## Existing selection
 
-## 22 existing channels + optional Teletext
+Workbook IDs: CH-001, CH-002, CH-003, CH-004, CH-005, CH-006, CH-007, CH-008, CH-009, CH-010, CH-011, CH-012, CH-013, CH-014, CH-015, CH-016, CH-017, CH-026, CH-213, CH-235, CH-236, CH-269. Teletext CH-020 remains optional.
 
-Retain the existing curated lineup and optional AussieTV Text (995).
+## 37 indexed expansion candidates
 
-## 38 indexed candidates
+Source: https://i.mjh.nz/au/Melbourne/list.html and tv.json (regional).
+Exact name/network matching, guarded public HTTPS HLS relay, no new
+device-specific headers. Presence in the index does not verify playback,
+DRM status or redistribution permission. Missing entries are omitted.
+10 Sport 2 and Hockey One were not present in the checked 27 November list;
+they remain exact-match candidates if the source returns them. Some
+channels lack schedule data or are short/event-only feeds. No made-up EPG.
+New numbers are assigned only where no previously assigned number exists.
 
-| Number | Channel | Source network | Category |
+| Workbook ID | Number | Channel | Network | Category |
+| --- | --- | --- | --- | --- |
+| CH-018 | 95 | 9Rush | Nine | General / FTA |
+| CH-021 | 44 | Channel 31 | Community | Community / Public |
+| CH-028 | 1209 | 7NEWS Spotlight | Seven | News / Business |
+| CH-030 | 1210 | ABC News in 90 Seconds | ABC | News / Business |
+| CH-033 | 1202 | Al Jazeera | International index | News / Business |
+| CH-035 | 1200 | BBC News | International index | News / Business |
+| CH-036 | 1207 | Bloomberg TV | International index | News / Business |
+| CH-039 | 1203 | DW English | International index | News / Business |
+| CH-040 | 1206 | euronews | SBS | News / Business |
+| CH-041 | 1204 | France 24 | SBS | News / Business |
+| CH-043 | 1201 | Sky News Now | Sky | News / Business |
+| CH-064 | 1101 | Air Crash Investigations | Seven | Science / Tech / Nature |
+| CH-066 | 1100 | Mythbusters | Seven | Science / Tech / Nature |
+| CH-068 | 1410 | Taronga 24/7 | Nine | Science / Tech / Nature |
+| CH-127 | 1600 | A Country Practice | Seven | Drama / Series |
+| CH-128 | 1601 | All Saints | Seven | Drama / Series |
+| CH-129 | 1602 | Blue Heelers | Seven | Drama / Series |
+| CH-131 | 1603 | Home and Away Classics | Seven | Drama / Series |
+| CH-150 | 1502 | Adult Animation | Ten | Comedy |
+| CH-151 | 1500 | BBC Comedy | Nine | Comedy |
+| CH-176 | 1503 | 9Crime | Nine | Crime / Mystery |
+| CH-177 | 1504 | 9Mystery&Paranormal | Nine | Crime / Mystery |
+| CH-190 | 1604 | Rush | Ten | Crime / Mystery |
+| CH-214 | 1507 | All-Star Cinema | Seven | Movies |
+| CH-215 | 1700 | Christmas Movies | Ten | Movies |
+| CH-217 | 1508 | Moviesphere | Ten | Movies |
+| CH-241 | 1710 | NickToons 90s | Ten | Kids / Family |
+| CH-272 | 1720 | BBC Antiques Roadshow | Nine | Food / Lifestyle |
+| CH-273 | 1509 | BBC Food | Nine | Food / Lifestyle |
+| CH-274 | 1510 | BBC Home & Garden | Nine | Food / Lifestyle |
+| CH-275 | 1721 | Better Homes And Gardens | Seven | Food / Lifestyle |
+| CH-276 | 1722 | Bondi Vet | Seven | Food / Lifestyle |
+| CH-336 | 1730 | Big Brother Live Stream | Ten | Reality / Entertainment |
+| CH-398 | 1301 | 10 Sport 2 | Ten | Sport |
+| CH-399 | 1300 | 7AFL | Seven | Sport |
+| CH-402 | 1306 | Hockey One | Seven | Sport |
+| CH-408 | 1304 | Redbull TV | International index | Sport |
+
+## 24 additional selected rows not exposed as streams
+
+No unverified provider URLs or access-control bypass. One row is an
+alternate provider for BBC Home & Garden, already in the indexed list.
+All others need an authorised compatible source and EPG verification.
+
+| Workbook ID | Channel | Candidate source | Status |
 | --- | --- | --- | --- |
-| 95 | 9Rush | Nine | General & community |
-| 44 | Channel 31 | Community | General & community |
-| 1000 | GOOD. | International index | General & community |
-| 1001 | YouTV | Ten | General & community |
-| 1200 | BBC News | International index | News & business |
-| 1201 | Sky News Now | Sky | News & business |
-| 1202 | Al Jazeera | International index | News & business |
-| 1203 | DW English | International index | News & business |
-| 1204 | France 24 | SBS | News & business |
-| 1205 | Channel News Asia (CNA) | International index | News & business |
-| 1206 | euronews | SBS | News & business |
-| 1207 | Bloomberg TV | International index | News & business |
-| 1208 | ausbiz | Seven | News & business |
-| 1300 | 7AFL | Seven | Sports |
-| 1301 | 10 Sport 2 | Ten | Sports |
-| 1302 | FIFA+ | SBS | Sports |
-| 1303 | Cricket Gold | Seven | Sports |
-| 1304 | Redbull TV | International index | Sports |
-| 1305 | Racing.com | Seven | Sports |
-| 1306 | Hockey One | Seven | Sports |
-| 1307 | WNBL 2026/27 | Nine | Sports |
-| 1400 | Wildest | Ten | Factual & documentaries |
-| 1401 | H2 | Nine | Factual & documentaries |
-| 1402 | History & Warfare | Ten | Factual & documentaries |
-| 1403 | True Stories | Ten | Factual & documentaries |
-| 1404 | Travel Australia | Seven | Factual & documentaries |
-| 1500 | BBC Comedy | Nine | Multi-show entertainment |
-| 1501 | Sitcom Central | Ten | Multi-show entertainment |
-| 1502 | Adult Animation | Ten | Multi-show entertainment |
-| 1503 | 9Crime | Nine | Multi-show entertainment |
-| 1504 | 9Mystery&Paranormal | Nine | Multi-show entertainment |
-| 1505 | Crime Time | Ten | Multi-show entertainment |
-| 1506 | True Crime Files | Seven | Multi-show entertainment |
-| 1507 | All-Star Cinema | Seven | Multi-show entertainment |
-| 1508 | Moviesphere | Ten | Multi-show entertainment |
-| 1509 | BBC Food | Nine | Multi-show entertainment |
-| 1510 | BBC Home & Garden | Nine | Multi-show entertainment |
-| 1511 | NickToons | Ten | Multi-show entertainment |
-
-## 49 pending or restricted candidates
-
-The remainder of the approved shortlist is tracked here, not inserted as
-dead tuner channels. Provider and regional availability, public compatible
-HLS, third-party playback permission, artwork and EPG need confirmation.
-Samsung TV Plus and Plex catalogues are not generic M3U export APIs.
-Do not use device emulation, protected endpoints or access-control bypass.
-
-| Channel | Candidate provider | Status |
-| --- | --- | --- |
-| 7Bravo | Seven | DRM / official player only |
-| Channel 44 Adelaide | CTV+ | official live player; direct feed not verified |
-| NHK World-Japan | NHK | official HLS and guide verification required |
-| ARTE | ARTE | Australian availability and supported HLS required |
-| KBS World | KBS | supported third-party feed required |
-| Samsung Television Network | Samsung TV Plus | Awaiting supported source and guide verification |
-| Sony One FAVES | Samsung TV Plus | Awaiting supported source and guide verification |
-| Sky News UK | Sky | Awaiting supported source and guide verification |
-| ABC News Live (US) | ABC US | Awaiting supported source and guide verification |
-| CBS News 24/7 | CBS | Awaiting supported source and guide verification |
-| NBC News NOW | NBC | Awaiting supported source and guide verification |
-| CBC News | Plex | Awaiting supported source and guide verification |
-| TRT World | TRT | Awaiting supported source and guide verification |
-| beIN SPORTS XTRA | Samsung TV Plus | Awaiting supported source and guide verification |
-| NFL Channel | Plex | Awaiting supported source and guide verification |
-| PGA Tour | Samsung TV Plus | Awaiting supported source and guide verification |
-| Tennis TV | Plex | Awaiting supported source and guide verification |
-| Tennis+ | Samsung TV Plus | Awaiting supported source and guide verification |
-| Women's Sports Network | Plex | Awaiting supported source and guide verification |
-| FIFA+ Women | Samsung TV Plus | Awaiting supported source and guide verification |
-| World Surf League 24/7 | Plex | Awaiting supported source and guide verification |
-| SportsGrid | Plex | Awaiting supported source and guide verification |
-| Documentary+ | Plex | Awaiting supported source and guide verification |
-| Adventure Earth | Plex | Awaiting supported source and guide verification |
-| NatureTime | Samsung TV Plus | Awaiting supported source and guide verification |
-| Real Wild | Samsung TV Plus / Plex | Awaiting supported source and guide verification |
-| PBS Science | Samsung TV Plus / Plex | Awaiting supported source and guide verification |
-| Popular Science | Samsung TV Plus / Plex | Awaiting supported source and guide verification |
-| Modern Marvels | Samsung TV Plus / Plex | Awaiting supported source and guide verification |
-| History Hit | Samsung TV Plus / Plex | Awaiting supported source and guide verification |
-| Wonder | Samsung TV Plus | Awaiting supported source and guide verification |
-| CNA Originals | Samsung TV Plus | Awaiting supported source and guide verification |
-| Bloomberg Originals | Samsung TV Plus | Awaiting supported source and guide verification |
-| SPEEDVISION | Plex | Awaiting supported source and guide verification |
-| BBC Travel | Samsung TV Plus | Awaiting supported source and guide verification |
-| Real Crime | Samsung TV Plus | Awaiting supported source and guide verification |
-| Grit TV | Samsung TV Plus | Awaiting supported source and guide verification |
-| Homeful Channel | Samsung TV Plus | Awaiting supported source and guide verification |
-| Gusto TV | Samsung TV Plus | Awaiting supported source and guide verification |
-| PBS Kids | Samsung TV Plus | Awaiting supported source and guide verification |
-| Kartoon Channel | Samsung TV Plus | Awaiting supported source and guide verification |
-| Vevo Pop | Samsung TV Plus | Awaiting supported source and guide verification |
-| Vevo Rock | Samsung TV Plus | Awaiting supported source and guide verification |
-| Vevo 80s | Samsung TV Plus | Awaiting supported source and guide verification |
-| Vevo 90's | Samsung TV Plus | Awaiting supported source and guide verification |
-| Vevo 2K | Samsung TV Plus | Awaiting supported source and guide verification |
-| Vevo Country | Samsung TV Plus | Awaiting supported source and guide verification |
-| That's ROCK | Samsung TV Plus | Awaiting supported source and guide verification |
-| VEEPS Concert Pass | Plex | Awaiting supported source and guide verification |
+| CH-019 | 7Bravo | Seven / MJH | DRM restriction; not enabled |
+| CH-044 | ABC News Live (US) | ABC US | Awaiting supported source verification |
+| CH-045 | CBS News 24/7 | CBS | Awaiting supported source verification |
+| CH-046 | NBC News NOW | NBC | Awaiting supported source verification |
+| CH-047 | Sky News UK | Sky | Awaiting supported source verification |
+| CH-053 | CBC News | Plex | Awaiting supported source verification |
+| CH-058 | NEWSMAX | Plex | Awaiting supported source verification |
+| CH-062 | USA TODAY | Plex | Awaiting supported source verification |
+| CH-070 | NASA+ | NASA | Live event/on-demand service; continuous linear HLS not established |
+| CH-083 | PBS Science | Samsung TV Plus / Plex | Awaiting supported source verification |
+| CH-084 | Popular Science | Samsung TV Plus / Plex | Awaiting supported source verification |
+| CH-085 | Real Wild | Samsung TV Plus / Plex | Awaiting supported source verification |
+| CH-088 | WeatherSpy | Samsung TV Plus | Awaiting supported source verification |
+| CH-141 | Law & Order | Samsung TV Plus | Awaiting supported source verification |
+| CH-145 | Stargate | Samsung TV Plus | Awaiting supported source verification |
+| CH-169 | Mr. Bean | Plex | Awaiting supported source verification |
+| CH-255 | Pokémon | Samsung TV Plus | Awaiting supported source verification |
+| CH-285 | BBC Home and Garden | Samsung TV Plus | Alternate source for selected BBC Home & Garden (CH-274); not a second channel |
+| CH-286 | BBC Travel | Samsung TV Plus | Awaiting supported source verification |
+| CH-304 | The Bob Ross Channel | Samsung TV Plus | Awaiting supported source verification |
+| CH-367 | Deal or No Deal | Samsung TV Plus | Awaiting supported source verification |
+| CH-424 | NFL Channel | Plex | Awaiting supported source verification |
+| CH-435 | TNA Wrestling Channel | Plex | Awaiting supported source verification |
+| CH-443 | NHK World-Japan | NHK | Awaiting supported source verification |

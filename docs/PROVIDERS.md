@@ -2,7 +2,7 @@
 
 The Australian regional lineup remains unchanged. Extra providers are disabled
 by default; enable only sources you have permission to play in third-party
-clients. No full FAST service is integrated or claimed working yet. Set AUSSIETV_EXTRA_AU_CHANNELS=1 to opt into the Round 2 shortlist (38 indexed candidates). See [lineup status](LINEUP.md). New entries do not use provider-supplied client impersonation headers. Missing entries are omitted; playback remains unverified.
+clients. No full FAST service is integrated or claimed working yet. Set AUSSIETV_EXTRA_AU_CHANNELS=1 to opt into the completed selection (37 indexed candidates). See [lineup status](LINEUP.md). New entries do not use provider-supplied client impersonation headers. Missing entries are omitted; playback remains unverified.
 
 ## Docker / Unraid
 
