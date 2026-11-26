@@ -100,3 +100,12 @@ All others need an authorised compatible source and EPG verification.
 | CH-424 | NFL Channel | Plex | Awaiting supported source verification |
 | CH-435 | TNA Wrestling Channel | Plex | Awaiting supported source verification |
 | CH-443 | NHK World-Japan | NHK | Awaiting supported source verification |
+
+## Playback troubleshooting
+
+Expanded streams keep all validated HLS variants in Fast Tune. Inline HLS
+session metadata is supported; URI-based session metadata, content steering,
+variable substitution and protected HLS remain unsupported. Authenticated
+Jellyfin diagnostics retain a separate bounded recentFailures history with
+upstreamStatus and reason where known. A provider HTTP 401/403 is not the
+same as an FFmpeg remux failure; no access restrictions are bypassed.

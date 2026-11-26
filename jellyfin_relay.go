@@ -30,6 +30,8 @@ type tuneEvent struct {
 	Status     int    `json:"status"`
 	TotalMS    int64  `json:"totalMs"`
 	UpstreamMS int64  `json:"upstreamMs,omitempty"`
+	UpstreamStatus int `json:"upstreamStatus,omitempty"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // Aggregate counters make successful media requests visible without emitting
@@ -42,20 +44,35 @@ var relayMediaBytes atomic.Int64
 var tuneHistory = struct {
 	sync.Mutex
 	events []tuneEvent
+	failures []tuneEvent
 }{}
 
 func recordTune(channel, mode string, code int, total, upstream time.Duration) {
+	recordTuneDetail(channel, mode, code, total, upstream, 0, "")
+}
+
+func recordTuneDetail(channel, mode string, code int, total, upstream time.Duration, upstreamStatus int, reason string) {
 	event := tuneEvent{At: time.Now().UTC().Format(time.RFC3339), Channel: channel,
-		Mode: mode, Status: code, TotalMS: total.Milliseconds(), UpstreamMS: upstream.Milliseconds()}
+		Mode: mode, Status: code, TotalMS: total.Milliseconds(), UpstreamMS: upstream.Milliseconds(), UpstreamStatus: upstreamStatus, Reason: reason}
 	tuneHistory.Lock()
 	tuneHistory.events = append(tuneHistory.events, event)
 	if len(tuneHistory.events) > 32 {
 		tuneHistory.events = append([]tuneEvent(nil), tuneHistory.events[len(tuneHistory.events)-32:]...)
 	}
+	if code >= 400 && code != 499 {
+		tuneHistory.failures = append(tuneHistory.failures,event)
+		if len(tuneHistory.failures)>64 {tuneHistory.failures=append([]tuneEvent(nil),tuneHistory.failures[len(tuneHistory.failures)-64:]...)}
+	}
 	tuneHistory.Unlock()
 	if mode != "segment" || code >= 400 {
-		log.Printf("Jellyfin %s channel=%q status=%d total_ms=%d upstream_ms=%d", mode, channel, code, event.TotalMS, event.UpstreamMS)
+		log.Printf("Jellyfin %s channel=%q status=%d total_ms=%d upstream_ms=%d upstream_status=%d reason=%q", mode, channel, code, event.TotalMS, event.UpstreamMS, upstreamStatus, reason)
 	}
+}
+
+func recentTuneFailures() []tuneEvent {
+	tuneHistory.Lock()
+	defer tuneHistory.Unlock()
+	return append([]tuneEvent{},tuneHistory.failures...)
 }
 
 func tuneEvents() []tuneEvent {
@@ -97,20 +114,43 @@ func relayURL(cfg jellyfinConfig, chID, remote string) string {
 	return relayURLWithHint(cfg, chID, remote, ".ts")
 }
 
+var errInvalidHLS = errors.New("provider did not return a valid HLS playlist")
+var errIndirectHLS = errors.New("unsupported HLS indirect resource directive")
+var errProtectedHLS = errors.New("protected HLS playlist is not supported")
+
+func hlsFailureReason(err error) string {
+	switch {
+	case errors.Is(err,errInvalidHLS): return "invalid-hls-manifest"
+	case errors.Is(err,errIndirectHLS): return "unsupported-hls-directive"
+	case errors.Is(err,errProtectedHLS): return "protected-hls"
+	default: return "invalid-or-blocked-hls-reference"
+	}
+}
+
 func rewriteRelayPlaylist(body []byte, base *url.URL, cfg jellyfinConfig, chID string) ([]byte, error) {
 	if len(body) == 0 || len(body) > 5<<20 || !strings.HasPrefix(strings.TrimPrefix(string(body), "\ufeff"), "#EXTM3U") {
-		return nil, errors.New("provider did not return a valid HLS playlist")
+		return nil, errInvalidHLS
 	}
 	lines := strings.Split(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n")
 	for i, item := range lines {
 		item = strings.TrimSpace(item)
 		// Reject indirect fetch/control tags not handled by this relay.
-		if strings.HasPrefix(item,"#EXT-X-CONTENT-STEERING") || strings.HasPrefix(item,"#EXT-X-DEFINE") || strings.HasPrefix(item,"#EXT-X-SESSION-DATA") || (strings.HasPrefix(item,"#") && strings.Contains(item,"URI=") && !strings.Contains(item,`URI="`)) {
-			return nil,errors.New("unsupported HLS indirect resource directive")
+		if strings.HasPrefix(item,"#EXT-X-CONTENT-STEERING") || strings.HasPrefix(item,"#EXT-X-DEFINE") || (strings.HasPrefix(item,"#") && strings.Contains(item,"URI=") && !strings.Contains(item,`URI="`)) {
+			return nil,errIndirectHLS
+		}
+		// Inline session metadata does not cause an additional network fetch.
+		// Keep rejecting URI-based session data and ambiguous attributes.
+		if strings.HasPrefix(item,"#EXT-X-SESSION-DATA:") {
+			attrs,ok:=fastTuneAttributes(strings.TrimPrefix(item,"#EXT-X-SESSION-DATA:"))
+			if !ok || attrs["DATA-ID"]=="" {return nil,errIndirectHLS}
+			if _,hasURI:=attrs["URI"];hasURI {return nil,errIndirectHLS}
+			if _,hasValue:=attrs["VALUE"];!hasValue {return nil,errIndirectHLS}
+			for key:=range attrs {if key!="DATA-ID" && key!="VALUE" && key!="LANGUAGE" {return nil,errIndirectHLS}}
+			continue
 		}
 		if strings.HasPrefix(item, "#EXT-X-KEY") || strings.HasPrefix(item, "#EXT-X-SESSION-KEY") {
 			if strings.Contains(item, "KEYFORMAT=") || strings.Contains(item, "METHOD=SAMPLE-AES") {
-				return nil, errors.New("protected HLS playlist is not supported")
+				return nil, errProtectedHLS
 			}
 		}
 		if item == "" {
@@ -218,7 +258,7 @@ func relayPlaylistOrSegment(w http.ResponseWriter, r *http.Request, cfg jellyfin
 			relayMediaFailures.Add(1)
 		}
 		http.Error(w, "Provider request unavailable", http.StatusBadGateway)
-		recordTune(ch.ID, mode, 502, time.Since(started), upstream)
+		recordTuneDetail(ch.ID, mode, 502, time.Since(started), upstream, 0, "provider-network-error")
 		return
 	}
 	defer response.Body.Close()
@@ -227,7 +267,7 @@ func relayPlaylistOrSegment(w http.ResponseWriter, r *http.Request, cfg jellyfin
 			relayMediaFailures.Add(1)
 		}
 		http.Error(w, fmt.Sprintf("Provider returned HTTP %d", response.StatusCode), http.StatusBadGateway)
-		recordTune(ch.ID, mode, 502, time.Since(started), upstream)
+		recordTuneDetail(ch.ID, mode, 502, time.Since(started), upstream, response.StatusCode, "provider-http-error")
 		return
 	}
 	finalURL := response.Request.URL
@@ -242,16 +282,17 @@ func relayPlaylistOrSegment(w http.ResponseWriter, r *http.Request, cfg jellyfin
 		body, err := io.ReadAll(limited)
 		if err != nil || len(body) > 5<<20 {
 			http.Error(w, "Manifest too large or unavailable", 502)
-			recordTune(ch.ID, mode, 502, time.Since(started), upstream)
+			recordTuneDetail(ch.ID, mode, 502, time.Since(started), upstream, response.StatusCode, "manifest-read-failed")
 			return
 		}
 		transformed, err := rewriteRelayPlaylist(body, finalURL, cfg, ch.ID)
 		if err != nil {
 			http.Error(w, "Unsupported HLS playlist", 415)
-			recordTune(ch.ID, mode, 415, time.Since(started), upstream)
+			recordTuneDetail(ch.ID, mode, 415, time.Since(started), upstream, response.StatusCode, hlsFailureReason(err))
 			return
 		}
-		if cfg.StreamMode == "fast-tune" {
+		if cfg.StreamMode == "fast-tune" && !requiresGuardedRelay(ch) {
+			// Keep all variants for expanded and custom providers until validated.
 			// Rewriting/validation runs first; selection cannot bypass URL or DRM checks.
 			transformed = selectFastTuneVariant(transformed)
 		}
@@ -317,6 +358,7 @@ func relayDiagnostics(w http.ResponseWriter, _ *http.Request, cfg jellyfinConfig
 		"additionalProviderChannels": len(installedProviders.Channels),
 		"jellyfinArtworkSync": getArtworkSyncReport(),
 		"events":                      tuneEvents(),
+		"recentFailures": recentTuneFailures(),
 		"relayManifestRequests":       relayManifestRequests.Load(),
 		"relayMediaRequests":          relayMediaRequests.Load(),
 		"relayMediaFailures":          relayMediaFailures.Load(),
