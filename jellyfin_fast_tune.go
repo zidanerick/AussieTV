@@ -78,6 +78,7 @@ func (s *fastTuneSession) appendPacket(p []byte) {
 	if pid==0 && p[1]&0x40!=0 {
 		s.pat=seq
 		s.hasPAT=true
+		s.probe=tsAudioProbe{}
 	}
 	s.probe.add(p)
 	_, video := s.probe.videoPIDs[pid]
@@ -155,7 +156,7 @@ func (p *fastTunePool) acquire(ch Channel) (*fastTuneSession,bool,error) {
 			return s,true,nil
 		}
 		// Do not start a replacement until the old producer has exited.
-		if !ended { return nil,false,errors.New("channel is stopping") }
+		if !ended || s.clients>0 { return nil,false,errors.New("channel is stopping") }
 		delete(p.sessions,ch.ID)
 	}
 	if len(p.sessions)>=fastTuneChannels { return nil,false,errors.New("fast tune channel limit reached") }
@@ -172,7 +173,7 @@ func (p *fastTunePool) acquire(ch Channel) (*fastTuneSession,bool,error) {
 		s.notify()
 		s.mu.Unlock()
 		p.mu.Lock()
-		if p.sessions[ch.ID]==s { delete(p.sessions,ch.ID) }
+		if p.sessions[ch.ID]==s && s.clients==0 { delete(p.sessions,ch.ID) }
 		if s.timer!=nil { s.timer.Stop(); s.timer=nil }
 		p.mu.Unlock()
 	}()
@@ -183,7 +184,15 @@ func (p *fastTunePool) release(s *fastTuneSession) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	s.clients--
-	if s.clients!=0 || p.closed || s.ctx.Err()!=nil { return }
+	if s.clients!=0 { return }
+	s.mu.Lock()
+	ended:=s.ended
+	s.mu.Unlock()
+	if ended {
+		for id,current:=range p.sessions { if current==s { delete(p.sessions,id); break } }
+		return
+	}
+	if p.closed || s.ctx.Err()!=nil { return }
 	// Identity check prevents a stale timer from stopping a reused session.
 	var timer *time.Timer
 	timer=time.AfterFunc(p.idle,func(){
@@ -229,7 +238,10 @@ func (p *fastTunePool) serve(w http.ResponseWriter,r *http.Request,ch Channel) {
 		}
 		select {
 		case <-r.Context().Done(): return
-		case <-s.ctx.Done(): http.Error(w,"Fast tune stream stopped",502); return
+		case <-s.ctx.Done():
+			// The producer may have finished with a valid buffered finite stream.
+			s.mu.Lock(); ready:=s.status==200 && s.hasJoin && s.join>=s.oldest(); s.mu.Unlock()
+			if !ready { http.Error(w,"Fast tune stream stopped",502); return }
 		case <-timer.C:
 			http.Error(w,"Fast tune join timed out",504)
 			recordTune(ch.ID,"fast-tune-join-timeout",504,time.Since(start),0)

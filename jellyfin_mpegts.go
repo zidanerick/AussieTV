@@ -166,8 +166,8 @@ func serveJellyfinMPEGTS(w http.ResponseWriter, r *http.Request, cfg jellyfinCon
 	defer cancel()
 	args := mpegTSFFmpegArgs(input)
 	if cfg.StreamMode == "fast-tune" {
-		// Emit PAT/PMT at video random-access points for safe shared joins.
-		args = append(args[:len(args)-2], append([]string{"-mpegts_flags","+resend_headers"},args[len(args)-2:]...)...)
+		// Request initial PAT/PMT headers; FFmpeg repeats PSI during normal TS muxing.
+		args = append(args[:len(args)-3], append([]string{"-mpegts_flags","+resend_headers"},args[len(args)-3:]...)...)
 	}
 	command := exec.CommandContext(ctx, ffmpeg, args...)
 	ffmpegexec.Configure(command)
