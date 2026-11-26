@@ -122,3 +122,5 @@ existing, uploaded, verified (HEAD 200) and failed counts for the last pass.
 These are not proof of display in every client. A title without confidently
 matched TVmaze artwork remains blank. Disable with SYNC=0; this does not
 delete any images already repaired.
+
+Artwork repair uses the supported Authorization: MediaBrowser Token header for Jellyfin 12 and older compatible servers; enabling legacy authorization is not required.

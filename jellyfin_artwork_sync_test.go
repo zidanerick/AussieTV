@@ -37,7 +37,7 @@ func TestArtworkSyncRepairsOnlyMissingExactProgrammes(t *testing.T) {
 	var uploads,checks,downloads atomic.Int32
 	var multi atomic.Bool
 	api:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
-		if r.Header.Get("X-Emby-Token")!="separate-test-api-token" || strings.Contains(r.URL.String(),"separate-test-api-token") {t.Error("unsafe API authorization");w.WriteHeader(401);return}
+		if r.Header.Get("Authorization")!=`MediaBrowser Token="separate-test-api-token"` || r.Header.Get("X-Emby-Token")!="" || strings.Contains(r.URL.String(),"separate-test-api-token") {t.Error("unsafe API authorization");w.WriteHeader(401);return}
 		switch r.URL.Path {
 		case "/System/Configuration/livetv":
 			tuners:=[]map[string]string{{"Type":"m3u","Url":feed.BaseURL+"/jellyfin/channels.m3u?key="+feed.Key}}
@@ -65,7 +65,7 @@ func TestArtworkSyncRepairsOnlyMissingExactProgrammes(t *testing.T) {
 	defer api.Close()
 	poster:=&http.Client{Transport:artworkTransport(func(req *http.Request)(*http.Response,error){
 		downloads.Add(1)
-		if req.URL.String()!=testPosterURL || req.Header.Get("X-Emby-Token")!="" {t.Error("untrusted poster request")}
+		if req.URL.String()!=testPosterURL || req.Header.Get("X-Emby-Token")!="" || req.Header.Get("Authorization")!="" {t.Error("untrusted poster request")}
 		return &http.Response{StatusCode:200,Body:io.NopCloser(bytes.NewReader(img.Bytes())),Header:make(http.Header),Request:req},nil
 	})}
 	c:=&artworkSyncConfig{base:api.URL,token:"separate-test-api-token",feed:feed,client:api.Client(),posterClient:poster}

@@ -74,7 +74,83 @@ func artworkSyncFromEnv(feed jellyfinConfig) (*artworkSyncConfig,error) {
 		if err!=nil || len(b)>4096 {return nil,errors.New("invalid Jellyfin API key file")}
 		token=strings.TrimSpace(string(b))
 	}
-	if len(token)<16 || len(token)>512 || strings.ContainsAny(token,"\r\n") || token==feed.Key {return nil,errors.New("artwork sync requires a separate Jellyfin administrator API key")}
+	if len(token)<16 || len(token)>512 || !regexp.MustCompile(`^[A-Za-z0-9._~-]+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+)
+
+// Optional direct image repair for the XMLTV importer in Jellyfin 12.
+// The credential is a Jellyfin administrator API key, distinct from the
+// read-only AussieTV feed key. It never enters a feed or browser endpoint.
+type artworkSyncConfig struct {
+	base, token string
+	feed jellyfinConfig
+	client *http.Client
+	posterClient *http.Client
+}
+
+const syncBatchLimit = 40
+const syncPosterMax = 4<<20
+
+var syncIDPattern = regexp.MustCompile(`(?i)^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`)
+
+type syncReport struct {
+	At string `json:"at,omitempty"`
+	Status string `json:"status"`
+	LastError string `json:"lastError,omitempty"`
+	Matched int `json:"matched"`
+	Existing int `json:"existing"`
+	Uploaded int `json:"uploaded"`
+	Verified int `json:"verified"`
+	Failed int `json:"failed"`
+}
+var artworkSyncStatus = struct{
+	sync.Mutex
+	report syncReport
+}{report:syncReport{Status:"disabled"}}
+
+func getArtworkSyncReport() syncReport {
+	artworkSyncStatus.Lock()
+	defer artworkSyncStatus.Unlock()
+	return artworkSyncStatus.report
+}
+
+func artworkSyncFromEnv(feed jellyfinConfig) (*artworkSyncConfig,error) {
+	if os.Getenv("AUSSIETV_JELLYFIN_ARTWORK_SYNC")!="1" {return nil,nil}
+	base:=strings.TrimRight(strings.TrimSpace(os.Getenv("AUSSIETV_JELLYFIN_SERVER_URL")),"/")
+	u,err:=url.Parse(base)
+	if err!=nil || u==nil || u.Hostname()=="" || (u.Scheme!="http" && u.Scheme!="https") || u.User!=nil || u.RawQuery!="" || u.ForceQuery || u.Fragment!="" || u.Opaque!="" {
+		return nil,errors.New("artwork sync requires a valid Jellyfin server URL")
+	}
+	token:=strings.TrimSpace(os.Getenv("AUSSIETV_JELLYFIN_API_KEY"))
+	if file:=os.Getenv("AUSSIETV_JELLYFIN_API_KEY_FILE");file!="" {
+		if token!="" {return nil,errors.New("configure only one Jellyfin API key source")}
+		f,err:=os.Open(file)
+		if err!=nil {return nil,errors.New("cannot read Jellyfin API key file")}
+		b,err:=io.ReadAll(io.LimitReader(f,4097));f.Close()
+		if err!=nil || len(b)>4096 {return nil,errors.New("invalid Jellyfin API key file")}
+		token=strings.TrimSpace(string(b))
+	}
+	if len(token)<16 || len(token)>512 || ).MatchString(token) || token==feed.Key {return nil,errors.New("artwork sync requires a separate Jellyfin administrator API key")}
 	return &artworkSyncConfig{base:base,token:token,feed:feed,client:&http.Client{
 		Timeout:15*time.Second,Transport:&http.Transport{Proxy:nil,ResponseHeaderTimeout:10*time.Second},
 		CheckRedirect:func(*http.Request,[]*http.Request)error{return http.ErrUseLastResponse},
@@ -86,7 +162,7 @@ func (c *artworkSyncConfig) request(ctx context.Context,method,path string,query
 	if len(query)>0 {endpoint+="?"+query.Encode()}
 	req,err:=http.NewRequestWithContext(ctx,method,endpoint,body)
 	if err!=nil {return nil,errors.New("invalid Jellyfin request")}
-	req.Header.Set("X-Emby-Token",c.token)
+	req.Header.Set("Authorization", `MediaBrowser Token="`+c.token+`"`)
 	if mime!="" {req.Header.Set("Content-Type",mime)}
 	resp,err:=c.client.Do(req)
 	if err!=nil {return nil,errors.New("Jellyfin connection failed")}
